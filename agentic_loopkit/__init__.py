@@ -22,6 +22,7 @@ from .events.store import append_event, load_events
 from .agents.base import AgentBase
 from .loops.ralf import RALFExecutor, RALFResult, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, CONFIDENCE_HIGH
 from .adapters.base import PollingAdapter
+from .adapters.clickup import ClickUpAdapter, ClickUpEventType
 
 __all__ = [
     "EventBus",
@@ -39,4 +40,6 @@ __all__ = [
     "CONFIDENCE_MEDIUM",
     "CONFIDENCE_HIGH",
     "PollingAdapter",
+    "ClickUpAdapter",
+    "ClickUpEventType",
 ]
