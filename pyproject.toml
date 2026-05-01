@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentic-loopkit"
+version = "0.1.0"
+description = "Local-first, event-driven agent runtime — OODA + RALF loops over a cheap-Kafka JSONL event bus"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []   # zero runtime deps — pure stdlib asyncio + dataclasses
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
