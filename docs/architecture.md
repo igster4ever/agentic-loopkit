@@ -232,6 +232,30 @@ returning `status="complete"` with low confidence. The executor replaces the res
 
 ---
 
+## OODA + ReAct composition
+
+OODA and ReAct are not alternatives — they are layers. OODA governs strategy and adaptation
+across events; ReAct governs step-by-step tool use within a single act() decision.
+
+```
+OODA (outer — strategic loop):
+  observe()  ── filter / gather signals from event stream
+  orient()   ── LLM reasons about what needs to happen         ← LLM call
+  decide()   ── choose which executor to invoke
+  act()      ── await ReActExecutor.run(event)
+                  └─ ReAct (inner — tool execution loop):
+                       think()    ── LLM picks next tool        ← LLM call
+                       execute()  ── call tool, get observation  (deterministic)
+                       on_step()  ── hook: log / telemetry
+                       (repeat until action="done" or max_steps)
+```
+
+RALF sits at the same level as ReAct — both are execution patterns invoked from OODA's act():
+- Use **ReAct** when the task is tool-driven (search, API calls, code execution).
+- Use **RALF** when the task requires bounded iterative refinement with crash-safe state.
+
+---
+
 ## PollingAdapter flow
 
 ```
@@ -255,6 +279,31 @@ returning `status="complete"` with low confidence. The executor replaces the res
 
 Cursor is opaque — use whatever the source API provides: Unix ms timestamp (ClickUp),
 ISO string, page token, sequence number, or a set of seen IDs.
+
+---
+
+## Planned extensions
+
+### Additional executors (see `docs/idioms-adoption-plan.md`)
+
+| Executor | File | Pattern | Status |
+|---|---|---|---|
+| `ReActExecutor` | `loops/react.py` | Thought→Action→Observation bounded loop | Planned |
+| `PlanExecutor` | `loops/plan.py` | LLM decomposition + per-step execution | Planned |
+| `ReflexionExecutor` | `loops/reflexion.py` | RALF + explicit critique phase | Planned |
+
+### EventMeta convention (see `CLAUDE.md`)
+
+An optional `EventMeta` dataclass will be added to `events/models.py`. Loopkit components
+write structured framework metadata (phase, loop_type, confidence, context text) into
+`payload["_meta"]`. Consumer payload keys are never modified. Not yet implemented.
+
+### Dashboard (see `docs/dashboard-architecture.md`)
+
+An optional `agentic_loopkit/dashboard/` package will provide a FastAPI management API
+(HTTP + WebSocket) and a `dashboard/ui/` Bun/Vite/React frontend — the event chain
+inspector shown in the design reference. Install via `pip install agentic-loopkit[dashboard]`.
+Not yet built.
 
 ---
 

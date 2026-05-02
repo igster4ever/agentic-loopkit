@@ -25,13 +25,22 @@ agentic_loopkit/
 │
 ├── loops/
 │   └── ralf.py              # RALFExecutor — bounded task loop (retrieve → act → learn → follow-up)
+│   # planned: react.py, plan.py, reflexion.py — see docs/idioms-adoption-plan.md
 │
 └── adapters/
     ├── base.py              # PollingAdapter — tick-driven external source bridge
     └── clickup.py           # ClickUpAdapter + ClickUpEventType — first concrete adapter
 
 docs/
-└── architecture.md          # Logical architecture, component roles, data flow (ASCII diagrams)
+├── architecture.md          # Logical architecture, component roles, data flow (ASCII diagrams)
+├── idioms-adoption-plan.md  # ReActExecutor / PlanExecutor / ReflexionExecutor design decisions
+└── dashboard-architecture.md # FastAPI management API + Bun/React dashboard spec
+
+tests/
+├── events/                  # test_models, test_router, test_store
+├── agents/                  # test_base (OODA pipeline)
+├── loops/                   # test_ralf
+└── adapters/                # test_base (PollingAdapter), test_clickup
 ```
 
 ## Core concepts
@@ -54,6 +63,25 @@ Traceability fields on every Event:
 - `correlation_id` — business workflow ID shared by all events in a flow
 
 Use `event.caused("child.type", "source", payload)` to create a child that inherits correlation_id.
+
+**EventMeta convention** (decided 2026-05-02, not yet implemented in code):
+Loopkit components emit structured framework metadata via a reserved `payload["_meta"]` key.
+Consumer domain payload keys are never touched. Use when emitting events from agents/executors:
+
+```python
+from agentic_loopkit.events.models import EventMeta  # to be added to models.py
+
+payload = {
+    **domain_data,
+    "_meta": EventMeta(
+        phase="act", loop_type="ooda", confidence=0.82,
+        context="Agent reasoning text for dashboard Context tab",
+    ).to_dict()
+}
+```
+
+Fields: `phase`, `loop_type` (`"ooda"|"ralf"|"react"|"plan"|"reflexion"`), `iteration`, `confidence`, `context`, `tags`.
+All fields optional. The dashboard renders `payload["_meta"]["context"]` in the Context tab.
 
 ### EventBus
 Single entry point. Owns the router, store directory, and registered agents/adapters.
@@ -116,6 +144,28 @@ from agentic_loopkit import (
 - **Adapters are not agents** — no reasoning, no LLM calls; deduplicate + emit only
 - **Open EventType** — loopkit never imports consumer event types; consumers own their domain enums
 - **Zero runtime deps** — stdlib only; `aiohttp` is consumer-supplied for ClickUpAdapter
+
+## OODA + ReAct composition pattern
+
+OODA and ReAct are **not alternatives** — they are layers. The canonical wiring:
+
+```
+OODA (outer — strategic loop):
+  observe()  → filter/gather signals from the event stream
+  orient()   → LLM reasons about what needs to happen
+  decide()   → choose which executor to invoke
+  act()      → await ReActExecutor.run(event)
+                 └─ ReAct (inner — tool execution loop):
+                      think()   → LLM picks next tool
+                      execute() → call tool, get observation
+                      (repeat until action="done")
+```
+
+OODA governs strategy and adaptation across events.
+ReAct governs step-by-step tool use within a single decision.
+RALF governs multi-step task execution with crash-safe state and confidence enforcement.
+
+See `docs/idioms-adoption-plan.md` for full executor specs and build order.
 
 ## Adding a new adapter
 
@@ -183,3 +233,13 @@ Stream wildcard `"*"` loads all stream files when calling `load_events()`.
 ```bash
 python -m pytest          # asyncio_mode = auto, testpaths = tests/
 ```
+
+87 tests, all passing (as of 2026-05-02). Coverage: EventBus, EventRouter, EventStore,
+AgentBase (all OODA short-circuit paths), RALFExecutor (confidence rejection, learn, follow-up),
+PollingAdapter (cursor, error event), ClickUpAdapter (payload mapping, dedup, cursor).
+
+## Dashboard (planned — not yet built)
+
+Optional FastAPI management API + Bun/Vite/React event inspector.
+Install with: `pip install agentic-loopkit[dashboard]`
+Full spec: `docs/dashboard-architecture.md`

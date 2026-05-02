@@ -8,10 +8,59 @@ version = "0.1.0"
 description = "Local-first, event-driven agent runtime — OODA + RALF loops over a cheap-Kafka JSONL event bus"
 readme = "README.md"
 requires-python = ">=3.11"
+license = {file = "LICENSE"}
+authors = [
+    {name = "Ivan Smith", email = "ismith@amelco.co.uk"},
+]
+keywords = [
+    "agents", "agentic", "ooda", "ralf", "react",
+    "event-bus", "event-driven", "asyncio", "loopkit",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Distributed Computing",
+    "Framework :: AsyncIO",
+    "Typing :: Typed",
+]
 dependencies = []   # zero runtime deps — pure stdlib asyncio + dataclasses
 
+[project.urls]
+Homepage   = "https://github.com/igster4ever/agentic-loopkit"
+Repository = "https://github.com/igster4ever/agentic-loopkit"
+
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio"]
+dashboard = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "websockets>=12",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
+
+[project.scripts]
+# Uncomment when agentic_loopkit/dashboard/__main__.py exists:
+# agentic-loopkit-dashboard = "agentic_loopkit.dashboard.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agentic_loopkit"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    ".venv/",
+    "dashboard/ui/node_modules/",
+    "dashboard/ui/dist/",
+    "*.pyc",
+    "__pycache__/",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
