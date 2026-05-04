@@ -23,6 +23,7 @@ from .events.store import append_event, load_events
 from .agents.base import AgentBase
 from .loops.ralf import RALFExecutor, RALFResult, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, CONFIDENCE_HIGH
 from .loops.react import ReActExecutor, ReActResult, ReActStep
+from .loops.plan import PlanExecutor, PlanResult, PlanStep
 from .adapters.base import PollingAdapter
 from .adapters.clickup import ClickUpAdapter, ClickUpEventType
 
@@ -50,6 +51,10 @@ __all__ = [
     "ReActExecutor",
     "ReActResult",
     "ReActStep",
+    # Executors — Plan
+    "PlanExecutor",
+    "PlanResult",
+    "PlanStep",
     # Adapters
     "PollingAdapter",
     "ClickUpAdapter",
