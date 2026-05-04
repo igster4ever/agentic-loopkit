@@ -1,4 +1,4 @@
-from agentic_loopkit.events.models import Event, SystemEventType
+from agentic_loopkit.events.models import Event, EventMeta, SystemEventType
 
 
 def test_stream_derived_from_event_type():
@@ -69,3 +69,60 @@ def test_from_dict_handles_missing_optional_fields():
     e = Event.from_dict(d)
     assert e.causation_id is None
     assert e.correlation_id is None
+
+
+# ── EventMeta ─────────────────────────────────────────────────────────────────
+
+def test_eventmeta_to_dict_omits_none_fields():
+    meta = EventMeta(phase="act")
+    d = meta.to_dict()
+    assert d == {"phase": "act"}
+    assert "loop_type" not in d
+    assert "confidence" not in d
+
+
+def test_eventmeta_to_dict_all_fields():
+    meta = EventMeta(
+        phase="think",
+        loop_type="react",
+        iteration=2,
+        confidence=0.82,
+        context="Searching for recent events",
+        tags=["tooling", "debugging"],
+    )
+    d = meta.to_dict()
+    assert d["phase"]      == "think"
+    assert d["loop_type"]  == "react"
+    assert d["iteration"]  == 2
+    assert d["confidence"] == 0.82
+    assert d["context"]    == "Searching for recent events"
+    assert d["tags"]       == ["tooling", "debugging"]
+
+
+def test_eventmeta_to_dict_empty_tags_omitted():
+    meta = EventMeta(loop_type="ooda")
+    d = meta.to_dict()
+    assert "tags" not in d
+
+
+def test_eventmeta_tags_are_copied():
+    tags = ["a", "b"]
+    meta = EventMeta(tags=tags)
+    d = meta.to_dict()
+    d["tags"].append("c")
+    assert meta.tags == ["a", "b"]  # original unmodified
+
+
+def test_event_meta_returns_meta_dict():
+    meta = EventMeta(phase="orient", loop_type="ooda", confidence=0.9)
+    e = Event(
+        event_type="test.event",
+        source="agent",
+        payload={"data": 1, "_meta": meta.to_dict()},
+    )
+    assert e.meta() == {"phase": "orient", "loop_type": "ooda", "confidence": 0.9}
+
+
+def test_event_meta_returns_none_when_absent():
+    e = Event(event_type="test.event", source="agent", payload={"data": 1})
+    assert e.meta() is None

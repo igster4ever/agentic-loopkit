@@ -26,7 +26,6 @@ from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any, Optional
 
-
 class SystemEventType(StrEnum):
     """Built-in loopkit system events.  Stream: 'system'."""
     BUS_STARTED     = "system.bus_started"
@@ -41,6 +40,51 @@ class SystemEventType(StrEnum):
 
 
 WILDCARD_STREAM = "*"  # subscribe to all streams
+
+
+@dataclass
+class EventMeta:
+    """
+    Optional loopkit framework metadata, stored at ``payload["_meta"]``.
+
+    Consumers embed this to give the dashboard a reliable inspection point
+    without constraining the top-level payload structure.  All fields are
+    optional — include only what is relevant for a given event.
+
+    Usage::
+
+        from agentic_loopkit.events.models import EventMeta
+
+        payload = {
+            **domain_data,
+            "_meta": EventMeta(
+                phase="act",
+                loop_type="react",
+                confidence=0.82,
+                context="Tool search: looking for recent ADR events",
+            ).to_dict()
+        }
+
+    Read back via ``event.meta()`` on any ``Event`` instance.
+    """
+
+    phase:      Optional[str]   = None  # "observe"|"orient"|"decide"|"act"|"think"|"execute"|"retrieve"|"learn"
+    loop_type:  Optional[str]   = None  # "ooda"|"ralf"|"react"|"plan"|"reflexion"
+    iteration:  Optional[int]   = None  # step/iteration number within the loop
+    confidence: Optional[float] = None  # 0.0–1.0
+    context:    Optional[str]   = None  # human-readable reasoning for dashboard Context tab
+    tags:       list[str]       = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise to dict, omitting None values and empty tag lists."""
+        out: dict[str, Any] = {}
+        if self.phase      is not None: out["phase"]      = self.phase
+        if self.loop_type  is not None: out["loop_type"]  = self.loop_type
+        if self.iteration  is not None: out["iteration"]  = self.iteration
+        if self.confidence is not None: out["confidence"] = self.confidence
+        if self.context    is not None: out["context"]    = self.context
+        if self.tags:                   out["tags"]        = list(self.tags)
+        return out
 
 
 @dataclass
@@ -106,6 +150,10 @@ class Event:
             causation_id   = self.event_id,
             correlation_id = self.correlation_id,
         )
+
+    def meta(self) -> Optional[dict[str, Any]]:
+        """Return the EventMeta dict from ``payload["_meta"]``, or None if absent."""
+        return self.payload.get("_meta")
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
