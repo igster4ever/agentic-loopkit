@@ -28,10 +28,10 @@ append-only JSONL log files, with two agent execution models layered on top.
 │               │  2. router fanout  │                                        │
 │               └──┬─────────────┬───┘                                        │
 │                  │             │                                             │
-│        ┌─────────▼───┐   ┌─────▼──────────┐                                │
-│        │  AgentBase  │   │ RALFExecutor   │                                │
-│        │  (OODA)     │   │ (task loop)    │                                │
-│        └─────────────┘   └────────────────┘                                │
+│        ┌─────────▼───┐   ┌─────▼──────────┐  ┌─────────────────┐          │
+│        │  AgentBase  │   │ RALFExecutor   │  │ ReActExecutor   │          │
+│        │  (OODA)     │   │ (task loop)    │  │ PlanExecutor    │          │
+│        └─────────────┘   └────────────────┘  └─────────────────┘          │
 │                                                                             │
 │   JSONL store  ~/.cache/<app>/events-<stream>.jsonl  (one file per stream) │
 │                ~/.cache/<app>/cursor-<adapter>.json  (adapter cursors)     │
@@ -65,8 +65,20 @@ append-only JSONL log files, with two agent execution models layered on top.
 │                │ retrieve → act → learn → follow_up. Hard cap on loops.    │
 │                │ LLM in act() only. Crash-safe via learn().                │
 ├────────────────┼────────────────────────────────────────────────────────────┤
+│ ReActExecutor  │ Bounded tool-use loop. Think → Execute until action="done"│
+│                │ or max_steps. LLM in think() only. execute() is           │
+│                │ deterministic. on_step() hook for telemetry. Composes     │
+│                │ inside OODA act() or PlanExecutor execute_step().         │
+├────────────────┼────────────────────────────────────────────────────────────┤
+│ PlanExecutor   │ Front-loaded decomposition. One LLM call in plan() to     │
+│                │ produce ordered PlanSteps; execute_step() runs each in    │
+│                │ sequence. Wire ReActExecutor inside execute_step() for    │
+│                │ tool-using steps. Status: complete / partial / failed.    │
+├────────────────┼────────────────────────────────────────────────────────────┤
 │ Event          │ Immutable record. stream auto-derived from event_type     │
 │                │ prefix. causation_id + correlation_id for traceability.   │
+│                │ Optional payload["_meta"] (EventMeta) for framework       │
+│                │ metadata — phase, loop_type, confidence, context.         │
 └────────────────┴────────────────────────────────────────────────────────────┘
 ```
 
@@ -102,7 +114,8 @@ Reactive pattern. Runs on every subscribed event.
              ← any phase returning None short-circuits here ─────┘
 ```
 
-LLM placement rule: **orient() only**. observe, decide, act are deterministic.
+LLM placement rule: **orient() only** in AgentBase. observe, decide, act are deterministic.
+In executor composition: LLM also lives in `think()` (ReActExecutor) and `plan()` (PlanExecutor) — never in `execute()` or `execute_step()`.
 
 ---
 
@@ -288,15 +301,16 @@ ISO string, page token, sequence number, or a set of seen IDs.
 
 | Executor | File | Pattern | Status |
 |---|---|---|---|
-| `ReActExecutor` | `loops/react.py` | Thought→Action→Observation bounded loop | Planned |
-| `PlanExecutor` | `loops/plan.py` | LLM decomposition + per-step execution | Planned |
+| `ReActExecutor` | `loops/react.py` | Thought→Action→Observation bounded loop | ✅ Built (2026-05-04) |
+| `PlanExecutor` | `loops/plan.py` | LLM decomposition + per-step execution | ✅ Built (2026-05-04) |
 | `ReflexionExecutor` | `loops/reflexion.py` | RALF + explicit critique phase | Planned |
 
 ### EventMeta convention (see `CLAUDE.md`)
 
-An optional `EventMeta` dataclass will be added to `events/models.py`. Loopkit components
+`EventMeta` is implemented in `events/models.py` (2026-05-04). Loopkit components
 write structured framework metadata (phase, loop_type, confidence, context text) into
-`payload["_meta"]`. Consumer payload keys are never modified. Not yet implemented.
+`payload["_meta"]`. Consumer payload keys are never modified.
+Read back via `event.meta()` — returns the dict or `None` if absent.
 
 ### Dashboard (see `docs/dashboard-architecture.md`)
 

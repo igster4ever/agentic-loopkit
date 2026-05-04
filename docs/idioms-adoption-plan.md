@@ -11,13 +11,13 @@ The OODA+ReAct composition pattern is documented as the canonical wiring example
 
 ## Decision Table
 
-| Idiom | Verdict | File | Priority |
-|---|---|---|---|
-| ReAct (Thought→Action→Observation) | **Build** | `loops/react.py` | 1 |
-| Plan-and-Execute | **Build** | `loops/plan.py` | 2 |
-| Reflexion | **Build** | `loops/reflexion.py` | 3 |
-| Tree-of-Thoughts | **Defer** | — | Out of scope v1 |
-| OODA+ReAct composition | **Document** | CLAUDE.md + architecture.md | This session |
+| Idiom | Verdict | File | Priority | Status |
+|---|---|---|---|---|
+| ReAct (Thought→Action→Observation) | **Build** | `loops/react.py` | 1 | ✅ Built 2026-05-04 |
+| Plan-and-Execute | **Build** | `loops/plan.py` | 2 | ✅ Built 2026-05-04 |
+| Reflexion | **Build** | `loops/reflexion.py` | 3 | Planned |
+| Tree-of-Thoughts | **Defer** | — | Out of scope v1 | Deferred |
+| OODA+ReAct composition | **Document** | CLAUDE.md + architecture.md | — | ✅ Done 2026-05-02 |
 
 ---
 
@@ -231,11 +231,11 @@ from .loops.reflexion import ReflexionExecutor
 
 ## Implementation Order
 
-1. `loops/react.py` — ReActExecutor + tests
-2. `loops/plan.py` — PlanExecutor + tests
+1. ✅ `loops/react.py` — ReActExecutor + tests (2026-05-04)
+2. ✅ `loops/plan.py` — PlanExecutor + tests (2026-05-04)
 3. `loops/reflexion.py` — ReflexionExecutor + tests
-4. Update `CLAUDE.md` and `docs/architecture.md` with composition pattern
-5. Update `__init__.py` exports after each
+4. ✅ Update `CLAUDE.md` and `docs/architecture.md` with composition pattern (2026-05-02, updated 2026-05-04)
+5. ✅ Update `__init__.py` exports after each (ongoing)
 
 ---
 
