@@ -24,8 +24,10 @@ agentic_loopkit/
 │   └── base.py              # AgentBase — OODA loop (observe → orient → decide → act)
 │
 ├── loops/
-│   └── ralf.py              # RALFExecutor — bounded task loop (retrieve → act → learn → follow-up)
-│   # planned: react.py, plan.py, reflexion.py — see docs/idioms-adoption-plan.md
+│   ├── ralf.py              # RALFExecutor — bounded task loop (retrieve → act → learn → follow-up)
+│   ├── react.py             # ReActExecutor — bounded tool-use loop (think → execute, action="done")
+│   ├── plan.py              # PlanExecutor — front-loaded decomposition (plan → execute_step × N)
+│   └── # planned: reflexion.py — RALFExecutor + critique() phase (see docs/idioms-adoption-plan.md)
 │
 └── adapters/
     ├── base.py              # PollingAdapter — tick-driven external source bridge
@@ -37,9 +39,9 @@ docs/
 └── dashboard-architecture.md # FastAPI management API + Bun/React dashboard spec
 
 tests/
-├── events/                  # test_models, test_router, test_store
+├── events/                  # test_models (incl. EventMeta), test_router, test_store
 ├── agents/                  # test_base (OODA pipeline)
-├── loops/                   # test_ralf
+├── loops/                   # test_ralf, test_react, test_plan
 └── adapters/                # test_base (PollingAdapter), test_clickup
 ```
 
@@ -64,12 +66,12 @@ Traceability fields on every Event:
 
 Use `event.caused("child.type", "source", payload)` to create a child that inherits correlation_id.
 
-**EventMeta convention** (decided 2026-05-02, not yet implemented in code):
+**EventMeta convention** (implemented 2026-05-04):
 Loopkit components emit structured framework metadata via a reserved `payload["_meta"]` key.
 Consumer domain payload keys are never touched. Use when emitting events from agents/executors:
 
 ```python
-from agentic_loopkit.events.models import EventMeta  # to be added to models.py
+from agentic_loopkit import EventMeta
 
 payload = {
     **domain_data,
@@ -81,7 +83,9 @@ payload = {
 ```
 
 Fields: `phase`, `loop_type` (`"ooda"|"ralf"|"react"|"plan"|"reflexion"`), `iteration`, `confidence`, `context`, `tags`.
-All fields optional. The dashboard renders `payload["_meta"]["context"]` in the Context tab.
+All fields optional. `to_dict()` omits None fields and empty tag lists.
+Read back via `event.meta()` — returns the `_meta` dict or `None` if absent.
+The dashboard renders `payload["_meta"]["context"]` in the Context tab.
 
 ### EventBus
 Single entry point. Owns the router, store directory, and registered agents/adapters.
@@ -112,6 +116,25 @@ Retrieve → Act → Learn → Follow-up. Hard cap at `max_iterations`.
 
 Confidence bands: HIGH ≥ 0.85, MEDIUM ≥ 0.65, LOW ≥ 0.40, **< 0.40 hard reject**.
 
+### ReActExecutor (bounded tool-use loop)
+Think → Execute. Hard cap at `max_steps`. Composes inside OODA's `act()` phase.
+- `think(event, trace)` → `(thought, action, action_input)` (primary LLM phase)
+- `execute(action, action_input)` → observation string (deterministic tool dispatch; no LLM)
+- `on_step(step)` → hook after each step (default no-op; use for dashboard telemetry)
+- `follow_up(event, result)` → return downstream Event or None
+
+Terminal signal: `action="done"` — `action_input` becomes `result.answer`.
+`result.status`: `"complete"` | `"max_steps_reached"` | `"error"`.
+
+### PlanExecutor (front-loaded task decomposition)
+Plan → Execute × N. Step list is fixed at plan time; no iteration cap on the plan itself.
+- `plan(event)` → `list[PlanStep]` (primary LLM call; decomposes task up front)
+- `execute_step(event, step, prior_outputs)` → `(output, success)` (wire ReActExecutor here)
+- `follow_up(event, result)` → return downstream Event or None
+
+`result.status`: `"complete"` (all steps succeeded) | `"partial"` (some failed) | `"failed"` (all failed or `plan()` raised).
+Each `ReActExecutor` wired inside `execute_step()` carries its own `max_steps` cap.
+
 ### PollingAdapter
 External system bridge. Tick-driven (APScheduler, asyncio loop, etc.).
 - `poll(cursor)` → `(list[Event], new_cursor)`
@@ -127,18 +150,29 @@ Requires `aiohttp` (optional dep — lazy-imported at call time).
 
 ```python
 from agentic_loopkit import (
-    EventBus, Event, SystemEventType, WILDCARD_STREAM,
+    # Bus
+    EventBus,
+    # Events
+    Event, EventMeta, SystemEventType, WILDCARD_STREAM,
     EventRouter, Subscriber,
     append_event, load_events,
-    AgentBase, RALFExecutor, RALFResult,
+    # Agents
+    AgentBase,
+    # Executors — RALF
+    RALFExecutor, RALFResult,
     CONFIDENCE_LOW, CONFIDENCE_MEDIUM, CONFIDENCE_HIGH,
+    # Executors — ReAct
+    ReActExecutor, ReActResult, ReActStep,
+    # Executors — Plan
+    PlanExecutor, PlanResult, PlanStep,
+    # Adapters
     PollingAdapter, ClickUpAdapter, ClickUpEventType,
 )
 ```
 
 ## Key design rules
 
-- **LLM is not the orchestrator** — it's called inside `orient()` and `act()` only
+- **LLM is not the orchestrator** — it's called inside `orient()` (OODA), `act()` (RALF), `think()` (ReAct), and `plan()` (PlanExecutor) only
 - **Loops must be bounded** — `max_iterations` hard cap, error result if exhausted
 - **Persist before fanout** — EventBus writes JSONL before routing
 - **Adapters are not agents** — no reasoning, no LLM calls; deduplicate + emit only
@@ -166,6 +200,32 @@ ReAct governs step-by-step tool use within a single decision.
 RALF governs multi-step task execution with crash-safe state and confidence enforcement.
 
 See `docs/idioms-adoption-plan.md` for full executor specs and build order.
+
+## Adding a new executor
+
+```python
+# agentic_loopkit/loops/my_executor.py
+from abc import abstractmethod
+from .react import ReActExecutor   # or RALFExecutor / PlanExecutor as base
+
+class MyExecutor(ReActExecutor):
+    max_steps = 5
+
+    async def think(self, event, trace):
+        thought = await call_llm(event.payload, trace)
+        return thought, action, action_input   # action="done" to terminate
+
+    async def execute(self, action, action_input):
+        return await dispatch_tool(action, action_input)
+
+    async def follow_up(self, event, result):
+        if result.is_complete:
+            return event.caused("my.complete", self.name, {"answer": result.answer})
+        return None
+```
+
+Then add to `agentic_loopkit/__init__.py` exports.
+Tests go in `tests/loops/test_my_executor.py` — follow `test_react.py` or `test_plan.py` as template.
 
 ## Adding a new adapter
 
@@ -234,8 +294,11 @@ Stream wildcard `"*"` loads all stream files when calling `load_events()`.
 python -m pytest          # asyncio_mode = auto, testpaths = tests/
 ```
 
-87 tests, all passing (as of 2026-05-02). Coverage: EventBus, EventRouter, EventStore,
+127 tests, all passing (as of 2026-05-04). Coverage: EventBus, EventRouter, EventStore,
 AgentBase (all OODA short-circuit paths), RALFExecutor (confidence rejection, learn, follow-up),
+ReActExecutor (happy path, max_steps, error handling, on_step hook, follow-up),
+PlanExecutor (all-complete, partial, failed, plan() raises, step exception recovery, prior_outputs),
+EventMeta (to_dict field omission, event.meta() helper),
 PollingAdapter (cursor, error event), ClickUpAdapter (payload mapping, dedup, cursor).
 
 ## Dashboard (planned — not yet built)
