@@ -6,8 +6,11 @@ in a configured list of channel IDs.  Call tick() on a schedule (e.g.
 every 60 seconds via APScheduler).
 
 Authentication:
-    Pass a bot token (xoxb-...) with the channels:history and
-    channels:read scopes.  Obtain at: https://api.slack.com/apps
+    Pass a user token (xoxp-...) — this is the proven, preferred choice.
+    Requires the channels:history and channels:read scopes.
+    Bot tokens (xoxb-...) are structurally accepted but user tokens have
+    broader channel access and were validated in practice.
+    Obtain at: https://api.slack.com/apps
 
 Cursor strategy:
     The cursor is a dict mapping channel_id → latest message ts seen.
@@ -29,7 +32,7 @@ Usage:
 
     adapter = SlackAdapter(
         bus         = bus,
-        bot_token   = os.environ["SLACK_BOT_TOKEN"],
+        bot_token   = os.environ["SLACK_USER_TOKEN"],   # xoxp-... preferred
         channel_ids = ["C12345678", "C87654321"],
     )
     bus.add_adapter(adapter)
@@ -65,7 +68,7 @@ class SlackAdapter(PollingAdapter):
 
     Attributes:
         name          adapter identifier (used in logs + cursor key)
-        bot_token     Slack bot token (xoxb-...)
+        bot_token     Slack user token (xoxp-... preferred) or bot token (xoxb-...)
         channel_ids   list of Slack channel IDs (C...) to poll
         page_size     messages per API page (default 100, Slack max 200)
     """
