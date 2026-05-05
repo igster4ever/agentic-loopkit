@@ -312,12 +312,24 @@ write structured framework metadata (phase, loop_type, confidence, context text)
 `payload["_meta"]`. Consumer payload keys are never modified.
 Read back via `event.meta()` — returns the dict or `None` if absent.
 
+### Additional adapters
+
+| Adapter | File | Source | Cursor | Status |
+|---|---|---|---|---|
+| `ClickUpAdapter` | `adapters/clickup.py` | ClickUp REST API | Unix ms timestamp | ✅ Built (2026-05-01) |
+| `SlackAdapter`   | `adapters/slack.py`   | Slack `conversations.history` | `{channel_id: ts}` dict | ✅ Built (2026-05-05) |
+| `LocalGitAdapter` | `adapters/git.py`   | Local git repo (`git log`) | commit SHA | ✅ Built (2026-05-05) |
+
 ### Dashboard (see `docs/dashboard-architecture.md`)
 
-An optional `agentic_loopkit/dashboard/` package will provide a FastAPI management API
-(HTTP + WebSocket) and a `dashboard/ui/` Bun/Vite/React frontend — the event chain
-inspector shown in the design reference. Install via `pip install agentic-loopkit[dashboard]`.
-Not yet built.
+`agentic_loopkit/dashboard/` — optional FastAPI management API.
+Install via `pip install agentic-loopkit[dashboard]`.
+
+**Backend API skeleton built (2026-05-05):** `create_app(bus)` factory,
+GET `/api/streams`, `/api/events`, `/api/events/{id}`, `/api/chains/{correlation_id}`,
+`/api/agents`, `/api/adapters`, WS `/ws/tail` live-tail endpoint.
+
+**Frontend (Bun/Vite/React) — not yet built.** Spec in `docs/dashboard-architecture.md`.
 
 ---
 

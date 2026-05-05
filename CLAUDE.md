@@ -31,7 +31,24 @@ agentic_loopkit/
 │
 └── adapters/
     ├── base.py              # PollingAdapter — tick-driven external source bridge
-    └── clickup.py           # ClickUpAdapter + ClickUpEventType — first concrete adapter
+    ├── clickup.py           # ClickUpAdapter + ClickUpEventType — polls ClickUp REST API
+    ├── slack.py             # SlackAdapter + SlackEventType — polls conversations.history
+    └── git.py               # LocalGitAdapter + GitEventType — polls local git repo via subprocess
+
+dashboard/
+└── (ui/ planned) — Bun + Vite + React frontend (not yet built)
+
+agentic_loopkit/dashboard/           # Optional FastAPI management API (pip install agentic-loopkit[dashboard])
+├── __init__.py              # exports create_app(bus) → FastAPI
+├── app.py                   # app factory + static file mount
+├── dependencies.py          # get_bus() FastAPI dependency
+├── ws.py                    # WS /ws/tail live-tail endpoint
+└── routes/
+    ├── events.py            # GET /api/events, GET /api/events/{event_id}
+    ├── chains.py            # GET /api/chains/{correlation_id}
+    ├── streams.py           # GET /api/streams
+    ├── agents.py            # GET /api/agents
+    └── adapters.py          # GET /api/adapters
 
 docs/
 ├── architecture.md          # Logical architecture, component roles, data flow (ASCII diagrams)
@@ -42,7 +59,8 @@ tests/
 ├── events/                  # test_models (incl. EventMeta), test_router, test_store
 ├── agents/                  # test_base (OODA pipeline)
 ├── loops/                   # test_ralf, test_react, test_plan, test_reflexion
-└── adapters/                # test_base (PollingAdapter), test_clickup
+├── adapters/                # test_base (PollingAdapter), test_clickup, test_slack, test_git
+└── dashboard/               # test_routes_streams, test_routes_events, test_routes_chains, test_routes_agents_adapters
 ```
 
 ## Core concepts
@@ -153,9 +171,19 @@ External system bridge. Tick-driven (APScheduler, asyncio loop, etc.).
 - Errors emit `system.adapter_error` events rather than raising
 
 ### ClickUpAdapter
-First concrete adapter. Polls `/list/{id}/task` or `/team/{id}/task` for updates since cursor.
+Polls `/list/{id}/task` or `/team/{id}/task` for updates since cursor.
 Cursor = Unix ms timestamp. Emits `clickup.task_updated` / `clickup.task_created`.
 Requires `aiohttp` (optional dep — lazy-imported at call time).
+
+### SlackAdapter
+Polls `conversations.history` per channel. Cursor = `{channel_id: ts}` dict.
+Emits `slack.message_received`. Handles pagination and 429 rate limits.
+Requires `aiohttp` (lazy-imported at call time).
+
+### LocalGitAdapter
+Polls a local git repository via subprocess `git log`. Zero extra deps — pure stdlib.
+Cursor = last seen commit SHA; first run fetches commits since `initial_since_hours` (default 24h).
+Emits `git.commit_added`. Use for any locally-cloned repo you pull regularly.
 
 ## Public API
 
@@ -179,7 +207,10 @@ from agentic_loopkit import (
     # Executors — Reflexion
     ReflexionExecutor,
     # Adapters
-    PollingAdapter, ClickUpAdapter, ClickUpEventType,
+    PollingAdapter,
+    ClickUpAdapter, ClickUpEventType,
+    SlackAdapter, SlackEventType,
+    LocalGitAdapter, GitEventType,
 )
 ```
 
@@ -308,17 +339,32 @@ Stream wildcard `"*"` loads all stream files when calling `load_events()`.
 # Note: system Python is blocked by PEP 668 on macOS — always use .venv/bin/python
 ```
 
-147 tests, all passing (as of 2026-05-05). Coverage: EventBus, EventRouter, EventStore,
+209 tests, all passing (as of 2026-05-05). Coverage: EventBus, EventRouter, EventStore,
 AgentBase (all OODA short-circuit paths), RALFExecutor (confidence rejection, learn, follow-up),
 ReActExecutor (happy path, max_steps, error handling, on_step hook, follow-up),
 PlanExecutor (all-complete, partial, failed, plan() raises, step exception recovery, prior_outputs),
 ReflexionExecutor (critique hook, forced iterations, post-critique confidence rejection,
 learn receives revised result, max_steps, follow-up),
 EventMeta (to_dict field omission, event.meta() helper),
-PollingAdapter (cursor, error event), ClickUpAdapter (payload mapping, dedup, cursor).
+PollingAdapter (cursor, error event), ClickUpAdapter (payload mapping, dedup, cursor),
+SlackAdapter (event mapping, per-channel cursor, pagination, rate-limit handling),
+LocalGitAdapter (git log parsing, SHA cursor, first-run since window, real-repo integration),
+dashboard routes (streams, events filter/pagination, events/{id} + related chain, chains DAG +
+summary, agents, adapters), dashboard chain builder (edge derivation, summary.status logic).
 
-## Dashboard (planned — not yet built)
+## Dashboard
 
 Optional FastAPI management API + Bun/Vite/React event inspector.
 Install with: `pip install agentic-loopkit[dashboard]`
-Full spec: `docs/dashboard-architecture.md`
+
+**Backend API skeleton — built (2026-05-05):**
+- `create_app(bus)` — factory; bind to any running EventBus
+- `GET /api/streams` — stream names, event counts, last timestamp
+- `GET /api/events` — filtered list (stream, event_type, correlation_id, source, since, limit)
+- `GET /api/events/{event_id}` — single event + related chain events
+- `GET /api/chains/{correlation_id}` — full DAG: events + causation edges + summary
+- `GET /api/agents` — registered agents + subscription streams
+- `GET /api/adapters` — registered adapters + cursor state
+- `WS /ws/tail` — live event stream with stream/event_type filtering
+
+**Frontend — not yet built.** Full spec: `docs/dashboard-architecture.md`
