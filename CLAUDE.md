@@ -27,7 +27,7 @@ agentic_loopkit/
 │   ├── ralf.py              # RALFExecutor — bounded task loop (retrieve → act → learn → follow-up)
 │   ├── react.py             # ReActExecutor — bounded tool-use loop (think → execute, action="done")
 │   ├── plan.py              # PlanExecutor — front-loaded decomposition (plan → execute_step × N)
-│   └── # planned: reflexion.py — RALFExecutor + critique() phase (see docs/idioms-adoption-plan.md)
+│   └── reflexion.py         # ReflexionExecutor — RALFExecutor + critique() between act() and learn()
 │
 └── adapters/
     ├── base.py              # PollingAdapter — tick-driven external source bridge
@@ -41,7 +41,7 @@ docs/
 tests/
 ├── events/                  # test_models (incl. EventMeta), test_router, test_store
 ├── agents/                  # test_base (OODA pipeline)
-├── loops/                   # test_ralf, test_react, test_plan
+├── loops/                   # test_ralf, test_react, test_plan, test_reflexion
 └── adapters/                # test_base (PollingAdapter), test_clickup
 ```
 
@@ -135,6 +135,17 @@ Plan → Execute × N. Step list is fixed at plan time; no iteration cap on the 
 `result.status`: `"complete"` (all steps succeeded) | `"partial"` (some failed) | `"failed"` (all failed or `plan()` raised).
 Each `ReActExecutor` wired inside `execute_step()` carries its own `max_steps` cap.
 
+### ReflexionExecutor (RALF + self-critique)
+Extends `RALFExecutor` — adds an explicit `critique()` phase between `act()` and `learn()` in each iteration. The critique can revise confidence to force another iteration or drive toward completion.
+- `retrieve(event)` → context (inherited; deterministic, no LLM)
+- `act(context, prior_result)` → `RALFResult` (primary drafting phase; LLM appropriate)
+- `critique(event, result)` → `(RALFResult, str)` (evaluation phase; LLM appropriate; **new**)
+- `learn(event, result)` → persist post-critique result (inherited)
+- `follow_up(event, result)` → return downstream Event or None (inherited)
+
+Confidence enforcement applies to the **post-critique** result, not the raw `act()` output.
+`result.status`: same as `RALFExecutor` — `"complete"` | `"in_progress"` | `"rejected"` | `"error"`.
+
 ### PollingAdapter
 External system bridge. Tick-driven (APScheduler, asyncio loop, etc.).
 - `poll(cursor)` → `(list[Event], new_cursor)`
@@ -165,6 +176,8 @@ from agentic_loopkit import (
     ReActExecutor, ReActResult, ReActStep,
     # Executors — Plan
     PlanExecutor, PlanResult, PlanStep,
+    # Executors — Reflexion
+    ReflexionExecutor,
     # Adapters
     PollingAdapter, ClickUpAdapter, ClickUpEventType,
 )
@@ -172,7 +185,7 @@ from agentic_loopkit import (
 
 ## Key design rules
 
-- **LLM is not the orchestrator** — it's called inside `orient()` (OODA), `act()` (RALF), `think()` (ReAct), and `plan()` (PlanExecutor) only
+- **LLM is not the orchestrator** — it's called inside `orient()` (OODA), `act()` (RALF), `think()` (ReAct), `plan()` (PlanExecutor), and `act()`/`critique()` (ReflexionExecutor) only
 - **Loops must be bounded** — `max_iterations` hard cap, error result if exhausted
 - **Persist before fanout** — EventBus writes JSONL before routing
 - **Adapters are not agents** — no reasoning, no LLM calls; deduplicate + emit only
@@ -294,10 +307,12 @@ Stream wildcard `"*"` loads all stream files when calling `load_events()`.
 python -m pytest          # asyncio_mode = auto, testpaths = tests/
 ```
 
-127 tests, all passing (as of 2026-05-04). Coverage: EventBus, EventRouter, EventStore,
+147 tests, all passing (as of 2026-05-05). Coverage: EventBus, EventRouter, EventStore,
 AgentBase (all OODA short-circuit paths), RALFExecutor (confidence rejection, learn, follow-up),
 ReActExecutor (happy path, max_steps, error handling, on_step hook, follow-up),
 PlanExecutor (all-complete, partial, failed, plan() raises, step exception recovery, prior_outputs),
+ReflexionExecutor (critique hook, forced iterations, post-critique confidence rejection,
+learn receives revised result, max_steps, follow-up),
 EventMeta (to_dict field omission, event.meta() helper),
 PollingAdapter (cursor, error event), ClickUpAdapter (payload mapping, dedup, cursor).
 

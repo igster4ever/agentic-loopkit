@@ -15,7 +15,7 @@ The OODA+ReAct composition pattern is documented as the canonical wiring example
 |---|---|---|---|---|
 | ReAct (Thought→Action→Observation) | **Build** | `loops/react.py` | 1 | ✅ Built 2026-05-04 |
 | Plan-and-Execute | **Build** | `loops/plan.py` | 2 | ✅ Built 2026-05-04 |
-| Reflexion | **Build** | `loops/reflexion.py` | 3 | Planned |
+| Reflexion | **Build** | `loops/reflexion.py` | 3 | ✅ Built 2026-05-05 |
 | Tree-of-Thoughts | **Defer** | — | Out of scope v1 | Deferred |
 | OODA+ReAct composition | **Document** | CLAUDE.md + architecture.md | — | ✅ Done 2026-05-02 |
 
@@ -233,7 +233,7 @@ from .loops.reflexion import ReflexionExecutor
 
 1. ✅ `loops/react.py` — ReActExecutor + tests (2026-05-04)
 2. ✅ `loops/plan.py` — PlanExecutor + tests (2026-05-04)
-3. `loops/reflexion.py` — ReflexionExecutor + tests
+3. ✅ `loops/reflexion.py` — ReflexionExecutor + tests (2026-05-05)
 4. ✅ Update `CLAUDE.md` and `docs/architecture.md` with composition pattern (2026-05-02, updated 2026-05-04)
 5. ✅ Update `__init__.py` exports after each (ongoing)
 

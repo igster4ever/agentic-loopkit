@@ -303,7 +303,7 @@ ISO string, page token, sequence number, or a set of seen IDs.
 |---|---|---|---|
 | `ReActExecutor` | `loops/react.py` | Thought→Action→Observation bounded loop | ✅ Built (2026-05-04) |
 | `PlanExecutor` | `loops/plan.py` | LLM decomposition + per-step execution | ✅ Built (2026-05-04) |
-| `ReflexionExecutor` | `loops/reflexion.py` | RALF + explicit critique phase | Planned |
+| `ReflexionExecutor` | `loops/reflexion.py` | RALF + explicit critique phase | ✅ Built (2026-05-05) |
 
 ### EventMeta convention (see `CLAUDE.md`)
 
