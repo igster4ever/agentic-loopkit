@@ -27,6 +27,8 @@ from .loops.plan import PlanExecutor, PlanResult, PlanStep
 from .loops.reflexion import ReflexionExecutor
 from .adapters.base import PollingAdapter
 from .adapters.clickup import ClickUpAdapter, ClickUpEventType
+from .adapters.slack import SlackAdapter, SlackEventType
+from .adapters.git import LocalGitAdapter, GitEventType
 
 __all__ = [
     # Bus
@@ -62,4 +64,8 @@ __all__ = [
     "PollingAdapter",
     "ClickUpAdapter",
     "ClickUpEventType",
+    "SlackAdapter",
+    "SlackEventType",
+    "LocalGitAdapter",
+    "GitEventType",
 ]

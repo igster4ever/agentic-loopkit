@@ -1,0 +1,124 @@
+"""
+agentic_loopkit/dashboard/routes/events.py
+
+GET /api/events                    — filtered event list
+GET /api/events/{event_id}         — single event + related events in same chain
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from ..dependencies import get_bus
+from ...bus import EventBus
+from ...events.models import WILDCARD_STREAM
+from ...events.store import load_events
+
+log = logging.getLogger("agentic_loopkit.dashboard.routes.events")
+router = APIRouter()
+
+_DEFAULT_LIMIT = 100
+_MAX_LIMIT     = 1000
+_DEFAULT_HOURS = 72
+
+
+@router.get("/events")
+async def list_events(
+    stream:         Optional[str] = Query(None),
+    event_type:     Optional[str] = Query(None),
+    correlation_id: Optional[str] = Query(None),
+    source:         Optional[str] = Query(None),
+    since:          Optional[str] = Query(None, description="ISO 8601 UTC — e.g. 2026-05-01T00:00:00Z"),
+    limit:          int           = Query(_DEFAULT_LIMIT, ge=1, le=_MAX_LIMIT),
+    bus: EventBus = Depends(get_bus),
+) -> dict:
+    """
+    Return a filtered list of events from the JSONL store.
+
+    All query parameters are optional.  Results are newest-first up to limit.
+
+    Response:
+        {
+          "events": [ ...Event dicts... ],
+          "total":  87,
+          "limit":  100
+        }
+    """
+    target_stream = stream or WILDCARD_STREAM
+
+    events = load_events(
+        stream         = target_stream,
+        store_dir      = bus.store_dir,
+        hours          = _DEFAULT_HOURS,
+        event_type     = event_type,
+        correlation_id = correlation_id,
+    )
+
+    # Additional filters not handled by load_events
+    if source:
+        events = [e for e in events if e.source == source]
+    if since:
+        events = [e for e in events if _iso(e.timestamp) >= since]
+
+    total  = len(events)
+    paged  = events[:limit]
+
+    return {
+        "events": [e.to_dict() for e in paged],
+        "total":  total,
+        "limit":  limit,
+    }
+
+
+@router.get("/events/{event_id}")
+async def get_event(
+    event_id: str,
+    bus: EventBus = Depends(get_bus),
+) -> dict:
+    """
+    Return a single event by event_id, plus related events in the same
+    correlation chain (lightweight — just type, id, timestamp).
+
+    Response:
+        {
+          "event":   { ...full Event dict... },
+          "related": [
+            {"event_id": "...", "event_type": "...", "timestamp": "..."},
+            ...
+          ]
+        }
+    """
+    all_events = load_events(WILDCARD_STREAM, store_dir=bus.store_dir, hours=_DEFAULT_HOURS)
+
+    target = next((e for e in all_events if e.event_id == event_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail=f"Event {event_id!r} not found")
+
+    related = []
+    if target.correlation_id:
+        related = [
+            {
+                "event_id":   e.event_id,
+                "event_type": str(e.event_type),
+                "timestamp":  _iso(e.timestamp),
+            }
+            for e in all_events
+            if e.correlation_id == target.correlation_id
+            and e.event_id != event_id
+        ]
+
+    return {"event": target.to_dict(), "related": related}
+
+
+# ── Helpers ────────────────────────────────────────────────────────────────────
+
+
+def _iso(dt) -> str:
+    from datetime import timezone
+    if hasattr(dt, "tzinfo") and dt.tzinfo is None:
+        from datetime import datetime as _dt
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
