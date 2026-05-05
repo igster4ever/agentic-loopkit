@@ -16,7 +16,7 @@ agentic_loopkit/
 ├── bus.py                   # EventBus: owns router, store, agent/adapter registry
 │
 ├── events/
-│   ├── models.py            # Event dataclass + SystemEventType(StrEnum)
+│   ├── models.py            # Event + EventMeta dataclasses + SystemEventType(StrEnum)
 │   ├── router.py            # Async callback fanout (Subscriber = Callable[[Event], Awaitable[None]])
 │   └── store.py             # JSONL per-stream persistence (~/.cache/<app>/events-<stream>.jsonl)
 │
@@ -219,7 +219,7 @@ See `docs/idioms-adoption-plan.md` for full executor specs and build order.
 ```python
 # agentic_loopkit/loops/my_executor.py
 from abc import abstractmethod
-from .react import ReActExecutor   # or RALFExecutor / PlanExecutor as base
+from .react import ReActExecutor   # or RALFExecutor / PlanExecutor / ReflexionExecutor as base
 
 class MyExecutor(ReActExecutor):
     max_steps = 5
@@ -304,7 +304,8 @@ Stream wildcard `"*"` loads all stream files when calling `load_events()`.
 ## Tests
 
 ```bash
-python -m pytest          # asyncio_mode = auto, testpaths = tests/
+.venv/bin/python -m pytest   # asyncio_mode = auto, testpaths = tests/
+# Note: system Python is blocked by PEP 668 on macOS — always use .venv/bin/python
 ```
 
 147 tests, all passing (as of 2026-05-05). Coverage: EventBus, EventRouter, EventStore,
