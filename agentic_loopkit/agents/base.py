@@ -129,5 +129,10 @@ class AgentBase(ABC):
 
     # ── Diagnostics ───────────────────────────────────────────────────────────
 
+    @property
+    def subscriptions(self) -> list[str]:
+        """Read-only view of the streams this agent is subscribed to."""
+        return list(self._subscriptions)
+
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name!r}, streams={self._subscriptions})"

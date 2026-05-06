@@ -133,6 +133,23 @@ class RALFExecutor(ABC):
         """
         return None
 
+    # ── Post-act hook ──────────────────────────────────────────────────────────
+
+    async def _post_act_hook(
+        self, event: Event, result: RALFResult, iteration: int
+    ) -> RALFResult:
+        """
+        Hook called after ``act()`` and before confidence enforcement each iteration.
+
+        Default: no-op (returns result unchanged).
+
+        Override to inject a critique or evaluation phase between ``act()``
+        and the confidence gate — see ``ReflexionExecutor`` for the canonical
+        example.  The hook is responsible for its own logging if it modifies
+        the result.
+        """
+        return result
+
     # ── Loop runner ────────────────────────────────────────────────────────────
 
     async def run(self, event: Event) -> RALFResult:
@@ -142,8 +159,14 @@ class RALFExecutor(ABC):
         Hard reject if confidence < CONFIDENCE_LOW at any step.
         Caps at max_iterations regardless of status.
         Always calls learn() and follow_up() on the final result.
+
+        Subclasses that need to inject a phase between act() and confidence
+        enforcement should override ``_post_act_hook()`` rather than ``run()``.
         """
-        log.info("[%s] starting RALF loop for %s", self.name, event.event_type)
+        log.info(
+            "[%s] starting %s for %s",
+            self.name, type(self).__name__, event.event_type,
+        )
 
         context = await self.retrieve(event)
         result: Optional[RALFResult] = None
@@ -152,10 +175,13 @@ class RALFExecutor(ABC):
             result = await self.act(context, result)
 
             log.debug(
-                "[%s] step %d/%d — status=%s confidence=%.2f",
+                "[%s] act %d/%d — status=%s confidence=%.2f",
                 self.name, i + 1, self.max_iterations,
                 result.status, result.confidence,
             )
+
+            # Post-act hook (e.g. critique phase in ReflexionExecutor)
+            result = await self._post_act_hook(event, result, i)
 
             # Hard reject on very low confidence
             if result.confidence < CONFIDENCE_LOW:
@@ -190,5 +216,5 @@ class RALFExecutor(ABC):
         if follow_up_event is not None:
             await self._bus.publish(follow_up_event)
 
-        log.info("[%s] RALF loop done — status=%s", self.name, result.status)
+        log.info("[%s] %s done — status=%s", self.name, type(self).__name__, result.status)
         return result

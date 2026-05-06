@@ -53,13 +53,9 @@ from __future__ import annotations
 
 import logging
 from abc import abstractmethod
-from typing import Optional, TYPE_CHECKING
 
 from ..events.models import Event
-from .ralf import RALFExecutor, RALFResult, CONFIDENCE_LOW
-
-if TYPE_CHECKING:
-    from ..bus import EventBus
+from .ralf import RALFExecutor, RALFResult
 
 log = logging.getLogger("agentic_loopkit.reflexion")
 
@@ -146,72 +142,22 @@ class ReflexionExecutor(RALFExecutor):
         """
         ...
 
-    # ── Loop runner ────────────────────────────────────────────────────────────
+    # ── Post-act hook (wires critique into the inherited RALF runner) ──────────
 
-    async def run(self, event: Event) -> RALFResult:
+    async def _post_act_hook(
+        self, event: Event, result: RALFResult, iteration: int
+    ) -> RALFResult:
         """
-        Execute the bounded Reflexion loop.
+        Invoke ``critique()`` after ``act()`` and log the critique note.
 
-        Identical to ``RALFExecutor.run()`` with one addition: after each
-        ``act()`` call, ``critique()`` is invoked and the result it returns
-        replaces the raw ``act()`` result before confidence enforcement and
-        ``learn()`` are applied.
-
-        Hard rejects if post-critique confidence < ``CONFIDENCE_LOW``.
-        Caps at ``max_iterations`` regardless of status.
-        Always calls ``learn()`` and ``follow_up()`` on the terminal result.
+        This hooks into ``RALFExecutor.run()`` so ``ReflexionExecutor`` does
+        not need to duplicate the loop logic — confidence enforcement,
+        ``learn()``, and ``follow_up()`` are all inherited unchanged.
         """
-        log.info("[%s] starting ReflexionExecutor for %s", self.name, event.event_type)
-
-        context = await self.retrieve(event)
-        result: Optional[RALFResult] = None
-
-        for i in range(self.max_iterations):
-            result = await self.act(context, result)
-
-            # ── Critique phase ─────────────────────────────────────────────
-            result, critique_note = await self.critique(event, result)
-            log.debug(
-                "[%s] critique %d/%d — status=%s confidence=%.2f note=%r",
-                self.name, i + 1, self.max_iterations,
-                result.status, result.confidence, critique_note,
-            )
-
-            # Hard reject on very low post-critique confidence
-            if result.confidence < CONFIDENCE_LOW:
-                log.warning(
-                    "[%s] post-critique confidence %.2f below threshold %.2f — rejecting",
-                    self.name, result.confidence, CONFIDENCE_LOW,
-                )
-                result = RALFResult(
-                    status       = "rejected",
-                    step_summary = result.step_summary,
-                    output       = None,
-                    confidence   = result.confidence,
-                    uncertainty  = (
-                        f"Confidence {result.confidence:.2f} below "
-                        f"rejection threshold {CONFIDENCE_LOW}"
-                    ),
-                    missing_information = result.missing_information,
-                )
-
-            await self.learn(event, result)
-
-            if result.is_terminal:
-                break
-        else:
-            # Loop exhausted without terminal status
-            result = RALFResult(
-                status       = "error",
-                step_summary = f"Max iterations ({self.max_iterations}) reached without completion",
-                output       = result.output if result else None,
-                confidence   = 0.0,
-            )
-            await self.learn(event, result)
-
-        follow_up_event = await self.follow_up(event, result)
-        if follow_up_event is not None:
-            await self._bus.publish(follow_up_event)
-
-        log.info("[%s] ReflexionExecutor done — status=%s", self.name, result.status)
+        result, critique_note = await self.critique(event, result)
+        log.debug(
+            "[%s] critique %d/%d — status=%s confidence=%.2f note=%r",
+            self.name, iteration + 1, self.max_iterations,
+            result.status, result.confidence, critique_note,
+        )
         return result

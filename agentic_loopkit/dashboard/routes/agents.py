@@ -33,7 +33,7 @@ async def list_agents(bus: EventBus = Depends(get_bus)) -> list[dict]:
         {
             "name":    agent.name,
             "type":    "OODA",
-            "streams": list(agent._subscriptions),
+            "streams": agent.subscriptions,
         }
-        for agent in bus._agents
+        for agent in bus.agents
     ]

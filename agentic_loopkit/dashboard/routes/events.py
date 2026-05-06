@@ -91,23 +91,29 @@ async def get_event(
           ]
         }
     """
-    all_events = load_events(WILDCARD_STREAM, store_dir=bus.store_dir, hours=_DEFAULT_HOURS)
-
-    target = next((e for e in all_events if e.event_id == event_id), None)
-    if target is None:
+    # Targeted ID lookup — short-circuits on first match rather than full scan
+    matches = load_events(
+        WILDCARD_STREAM, store_dir=bus.store_dir,
+        hours=_DEFAULT_HOURS, event_id=event_id,
+    )
+    if not matches:
         raise HTTPException(status_code=404, detail=f"Event {event_id!r} not found")
+    target = matches[0]
 
     related = []
     if target.correlation_id:
+        chain_events = load_events(
+            WILDCARD_STREAM, store_dir=bus.store_dir,
+            hours=_DEFAULT_HOURS, correlation_id=target.correlation_id,
+        )
         related = [
             {
                 "event_id":   e.event_id,
                 "event_type": str(e.event_type),
                 "timestamp":  _iso(e.timestamp),
             }
-            for e in all_events
-            if e.correlation_id == target.correlation_id
-            and e.event_id != event_id
+            for e in chain_events
+            if e.event_id != event_id
         ]
 
     return {"event": target.to_dict(), "related": related}

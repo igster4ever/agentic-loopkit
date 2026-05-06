@@ -114,6 +114,18 @@ class EventBus:
         self._started = False
         log.info("[bus] stopped")
 
+    # ── Public read-only accessors ────────────────────────────────────────────
+
+    @property
+    def agents(self) -> list["AgentBase"]:
+        """Registered agents (read-only snapshot)."""
+        return list(self._agents)
+
+    @property
+    def adapters(self) -> list["PollingAdapter"]:
+        """Registered adapters (read-only snapshot)."""
+        return list(self._adapters)
+
     # ── Diagnostics ───────────────────────────────────────────────────────────
 
     @property

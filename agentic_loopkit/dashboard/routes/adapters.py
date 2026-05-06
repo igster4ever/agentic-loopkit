@@ -38,11 +38,11 @@ async def list_adapters(bus: EventBus = Depends(get_bus)) -> list[dict]:
         {
             "name":        adapter.name,
             "type":        type(adapter).__name__,
-            "cursor":      _serialise_cursor(adapter._cursor),
+            "cursor":      _serialise_cursor(adapter.cursor_state()),
             "last_tick":   None,   # not tracked in current PollingAdapter
             "error_count": 0,      # not tracked in current PollingAdapter
         }
-        for adapter in bus._adapters
+        for adapter in bus.adapters
     ]
 
 

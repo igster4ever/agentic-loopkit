@@ -40,6 +40,7 @@ def load_events(
     hours: int = _RETENTION_HOURS,
     event_type: Optional[str] = None,
     correlation_id: Optional[str] = None,
+    event_id: Optional[str] = None,
 ) -> list[Event]:
     """
     Return events for stream from the last `hours` hours, newest first.
@@ -47,15 +48,21 @@ def load_events(
     Filters:
       event_type     — exact match on event_type string
       correlation_id — return only events belonging to a workflow
+      event_id       — return at most one event with this exact ID
+                       (short-circuits on first match; cheap even over wildcard)
       stream="*"     — load from all stream files
     """
     if stream == WILDCARD_STREAM:
         events: list[Event] = []
         for path in store_dir.glob("events-*.jsonl"):
-            events.extend(_read_path(path, hours, event_type, correlation_id))
+            batch = _read_path(path, hours, event_type, correlation_id, event_id)
+            events.extend(batch)
+            if event_id and events:
+                # Found the target — no need to scan remaining stream files
+                return events
         return sorted(events, key=lambda e: e.timestamp, reverse=True)
 
-    return _read_path(_stream_path(stream, store_dir), hours, event_type, correlation_id)
+    return _read_path(_stream_path(stream, store_dir), hours, event_type, correlation_id, event_id)
 
 
 def load_all_events(stream: str, store_dir: Path = _DEFAULT_CACHE) -> list[Event]:
@@ -107,6 +114,7 @@ def _read_path(
     hours: int,
     event_type: Optional[str],
     correlation_id: Optional[str] = None,
+    event_id: Optional[str] = None,
 ) -> list[Event]:
     if not path.exists():
         return []
@@ -128,7 +136,12 @@ def _read_path(
                     continue
                 if correlation_id and e.correlation_id != correlation_id:
                     continue
+                if event_id and e.event_id != event_id:
+                    continue
                 events.append(e)
+                if event_id:
+                    # Short-circuit: event IDs are unique; no need to scan further
+                    break
             except json.JSONDecodeError as exc:
                 log.warning("[store] malformed JSONL at %s line %d: %s", path.name, line_no, exc)
             except (KeyError, ValueError) as exc:

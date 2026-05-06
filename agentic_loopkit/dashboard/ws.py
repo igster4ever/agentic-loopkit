@@ -22,9 +22,11 @@ import asyncio
 import json
 import logging
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
+from ..bus import EventBus
 from ..events.models import WILDCARD_STREAM
+from .dependencies import get_bus
 
 log = logging.getLogger("agentic_loopkit.dashboard.ws")
 router = APIRouter()
@@ -35,6 +37,7 @@ async def live_tail(
     websocket:  WebSocket,
     stream:     str = WILDCARD_STREAM,
     event_type: str = "",
+    bus:        EventBus = Depends(get_bus),
 ) -> None:
     """
     Stream events live to a connected WebSocket client.
@@ -42,7 +45,6 @@ async def live_tail(
     Each event is serialised as JSON and sent as a text frame.
     The client may optionally pass stream / event_type query params to filter.
     """
-    bus = websocket.app.state.bus
     await websocket.accept()
 
     queue: asyncio.Queue = asyncio.Queue(maxsize=500)

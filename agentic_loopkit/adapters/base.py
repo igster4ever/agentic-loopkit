@@ -45,7 +45,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional, TYPE_CHECKING
 
-from ..events.models import Event
+from ..events.models import Event, SystemEventType
 
 if TYPE_CHECKING:
     from ..bus import EventBus
@@ -95,7 +95,7 @@ class PollingAdapter(ABC):
         except Exception as exc:
             log.error("[%s] poll error: %s", self.name, exc, exc_info=True)
             await self._bus.publish(Event(
-                event_type = "system.adapter_error",
+                event_type = SystemEventType.ADAPTER_ERROR,
                 source     = self.name,
                 payload    = {"error": str(exc), "adapter": self.name},
             ))
@@ -136,6 +136,15 @@ class PollingAdapter(ABC):
             path.write_text(json.dumps(cursor))
         except Exception as exc:
             log.warning("[%s] could not save cursor: %s", self.name, exc)
+
+    def cursor_state(self) -> Any:
+        """
+        Return the current cursor value in a form safe to expose externally.
+
+        Default: returns ``self._cursor`` as-is.  Override in subclasses to
+        redact credential-adjacent content (e.g. tokens embedded in cursor dicts).
+        """
+        return self._cursor
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name!r})"
