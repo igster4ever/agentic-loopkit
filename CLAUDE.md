@@ -268,6 +268,18 @@ class MyExecutor(ReActExecutor):
         return None
 ```
 
+**Extending RALFExecutor without duplicating `run()`:** override `_post_act_hook()` to inject a
+phase between `act()` and confidence enforcement. The hook receives `(event, result, iteration)`
+and must return a `RALFResult`. This is how `ReflexionExecutor` wires `critique()` — never copy
+`run()`.
+
+```python
+class MyRalfVariant(RALFExecutor):
+    async def _post_act_hook(self, event, result, iteration):
+        revised, note = await self.my_eval_phase(event, result)
+        return revised   # confidence enforcement + learn() run on this result
+```
+
 Then add to `agentic_loopkit/__init__.py` exports.
 Tests go in `tests/loops/test_my_executor.py` — follow `test_react.py` or `test_plan.py` as template.
 
@@ -339,18 +351,19 @@ Stream wildcard `"*"` loads all stream files when calling `load_events()`.
 # Note: system Python is blocked by PEP 668 on macOS — always use .venv/bin/python
 ```
 
-209 tests, all passing (as of 2026-05-05). Coverage: EventBus, EventRouter, EventStore,
-AgentBase (all OODA short-circuit paths), RALFExecutor (confidence rejection, learn, follow-up),
-ReActExecutor (happy path, max_steps, error handling, on_step hook, follow-up),
-PlanExecutor (all-complete, partial, failed, plan() raises, step exception recovery, prior_outputs),
-ReflexionExecutor (critique hook, forced iterations, post-critique confidence rejection,
-learn receives revised result, max_steps, follow-up),
+220 tests, all passing (as of 2026-05-06). Coverage: EventBus, EventRouter, EventStore,
+AgentBase (all OODA short-circuit paths), RALFExecutor (confidence rejection, learn, follow-up,
+_post_act_hook extension), ReActExecutor (happy path, max_steps, error handling, on_step hook,
+follow-up), PlanExecutor (all-complete, partial, failed, plan() raises, step exception recovery,
+prior_outputs), ReflexionExecutor (critique hook, forced iterations, post-critique confidence
+rejection, learn receives revised result, max_steps, follow-up),
 EventMeta (to_dict field omission, event.meta() helper),
 PollingAdapter (cursor, error event), ClickUpAdapter (payload mapping, dedup, cursor),
 SlackAdapter (event mapping, per-channel cursor, pagination, rate-limit handling),
 LocalGitAdapter (git log parsing, SHA cursor, first-run since window, real-repo integration),
 dashboard routes (streams, events filter/pagination, events/{id} + related chain, chains DAG +
-summary, agents, adapters), dashboard chain builder (edge derivation, summary.status logic).
+summary, agents, adapters), dashboard chain builder (edge derivation, summary.status logic),
+dashboard WS /ws/tail (connect/disconnect, stream filter, router lifecycle, queue-full drop).
 
 ## Dashboard
 
