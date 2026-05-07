@@ -25,6 +25,7 @@ from .loops.ralf import RALFExecutor, RALFResult, CONFIDENCE_LOW, CONFIDENCE_MED
 from .loops.react import ReActExecutor, ReActResult, ReActStep
 from .loops.plan import PlanExecutor, PlanResult, PlanStep
 from .loops.reflexion import ReflexionExecutor
+from .loops.outcome import OutcomeExecutor
 from .adapters.base import PollingAdapter
 from .adapters.clickup import ClickUpAdapter, ClickUpEventType
 from .adapters.slack import SlackAdapter, SlackEventType
@@ -60,6 +61,8 @@ __all__ = [
     "PlanStep",
     # Executors — Reflexion
     "ReflexionExecutor",
+    # Executors — Outcome
+    "OutcomeExecutor",
     # Adapters
     "PollingAdapter",
     "ClickUpAdapter",

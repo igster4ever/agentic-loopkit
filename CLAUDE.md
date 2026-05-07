@@ -27,7 +27,8 @@ agentic_loopkit/
 │   ├── ralf.py              # RALFExecutor — bounded task loop (retrieve → act → learn → follow-up)
 │   ├── react.py             # ReActExecutor — bounded tool-use loop (think → execute, action="done")
 │   ├── plan.py              # PlanExecutor — front-loaded decomposition (plan → execute_step × N)
-│   └── reflexion.py         # ReflexionExecutor — RALFExecutor + critique() between act() and learn()
+│   ├── reflexion.py         # ReflexionExecutor — RALFExecutor + critique() between act() and learn()
+│   └── outcome.py           # OutcomeExecutor — RALFExecutor + rubric-governed isolated evaluation
 │
 └── adapters/
     ├── base.py              # PollingAdapter — tick-driven external source bridge
@@ -164,6 +165,27 @@ Extends `RALFExecutor` — adds an explicit `critique()` phase between `act()` a
 Confidence enforcement applies to the **post-critique** result, not the raw `act()` output.
 `result.status`: same as `RALFExecutor` — `"complete"` | `"in_progress"` | `"rejected"` | `"error"`.
 
+### OutcomeExecutor (rubric-governed iteration)
+Extends `RALFExecutor` — adds a rubric and an isolated `evaluate()` phase via `_post_act_hook()`.
+Each iteration: `act()` produces an artifact, `evaluate()` checks it against the rubric in a
+**fresh context** (no agent reasoning history). Gaps feed the next `act()` call; satisfied exits.
+
+- `rubric` → abstract property: markdown criteria (explicit + gradeable)
+- `retrieve(event)` → context (inherited; deterministic, no LLM)
+- `act(context, prior_result)` → `RALFResult` (primary drafting phase; LLM appropriate)
+- `evaluate(artifact, rubric)` → `(satisfied: bool, gaps: list[str])` — **isolated context only**
+- `learn(event, result)` → persist post-evaluate result (inherited)
+- `follow_up(event, result)` → return downstream Event or None (inherited)
+
+**Isolation contract**: `evaluate()` must call the LLM with *only* `(artifact, rubric)` — no prior
+chain. This prevents anchoring and mirrors the Anthropic Managed Agents grader.
+
+Key distinction from `ReflexionExecutor`: Reflexion's `critique()` runs in the same context as
+`act()` (self-critique); `OutcomeExecutor.evaluate()` runs in an isolated context (external grader).
+
+Default `max_iterations = 3` (matches Anthropic Managed Agents default).
+Exit states: `satisfied → "complete"` (confidence=1.0) | max_iterations → `"error"` (inherited).
+
 ### PollingAdapter
 External system bridge. Tick-driven (APScheduler, asyncio loop, etc.).
 - `poll(cursor)` → `(list[Event], new_cursor)`
@@ -206,6 +228,8 @@ from agentic_loopkit import (
     PlanExecutor, PlanResult, PlanStep,
     # Executors — Reflexion
     ReflexionExecutor,
+    # Executors — Outcome
+    OutcomeExecutor,
     # Adapters
     PollingAdapter,
     ClickUpAdapter, ClickUpEventType,
@@ -216,7 +240,7 @@ from agentic_loopkit import (
 
 ## Key design rules
 
-- **LLM is not the orchestrator** — it's called inside `orient()` (OODA), `act()` (RALF), `think()` (ReAct), `plan()` (PlanExecutor), and `act()`/`critique()` (ReflexionExecutor) only
+- **LLM is not the orchestrator** — it's called inside `orient()` (OODA), `act()` (RALF), `think()` (ReAct), `plan()` (PlanExecutor), `act()`/`critique()` (ReflexionExecutor), and `act()`/`evaluate()` (OutcomeExecutor) only
 - **Loops must be bounded** — `max_iterations` hard cap, error result if exhausted
 - **Persist before fanout** — EventBus writes JSONL before routing
 - **Adapters are not agents** — no reasoning, no LLM calls; deduplicate + emit only
@@ -250,7 +274,7 @@ See `docs/idioms-adoption-plan.md` for full executor specs and build order.
 ```python
 # agentic_loopkit/loops/my_executor.py
 from abc import abstractmethod
-from .react import ReActExecutor   # or RALFExecutor / PlanExecutor / ReflexionExecutor as base
+from .react import ReActExecutor   # or RALFExecutor / PlanExecutor / ReflexionExecutor / OutcomeExecutor as base
 
 class MyExecutor(ReActExecutor):
     max_steps = 5
@@ -351,12 +375,15 @@ Stream wildcard `"*"` loads all stream files when calling `load_events()`.
 # Note: system Python is blocked by PEP 668 on macOS — always use .venv/bin/python
 ```
 
-220 tests, all passing (as of 2026-05-06). Coverage: EventBus, EventRouter, EventStore,
+243 tests, all passing (as of 2026-05-07). Coverage: EventBus, EventRouter, EventStore,
 AgentBase (all OODA short-circuit paths), RALFExecutor (confidence rejection, learn, follow-up,
 _post_act_hook extension), ReActExecutor (happy path, max_steps, error handling, on_step hook,
 follow-up), PlanExecutor (all-complete, partial, failed, plan() raises, step exception recovery,
 prior_outputs), ReflexionExecutor (critique hook, forced iterations, post-critique confidence
 rejection, learn receives revised result, max_steps, follow-up),
+OutcomeExecutor (evaluate called with artifact+rubric only, satisfied first-pass, needs-revision
+loop, gaps fed to next act() via prior_result, learn sequence, max_iterations, follow_up,
+isolation contract — evaluate signature verified, default max_iterations=3),
 EventMeta (to_dict field omission, event.meta() helper),
 PollingAdapter (cursor, error event), ClickUpAdapter (payload mapping, dedup, cursor),
 SlackAdapter (event mapping, per-channel cursor, pagination, rate-limit handling),
