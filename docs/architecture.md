@@ -3,7 +3,8 @@
 ## Overview
 
 agentic-loopkit implements the "Cheap Kafka" pattern: a local-first event bus backed by
-append-only JSONL log files, with two agent execution models layered on top.
+append-only JSONL log files, with a reactive agent model (OODA) and a family of bounded
+executor patterns layered on top.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -30,8 +31,10 @@ append-only JSONL log files, with two agent execution models layered on top.
 │                  │             │                                             │
 │        ┌─────────▼───┐   ┌─────▼──────────┐  ┌─────────────────┐          │
 │        │  AgentBase  │   │ RALFExecutor   │  │ ReActExecutor   │          │
-│        │  (OODA)     │   │ (task loop)    │  │ PlanExecutor    │          │
-│        └─────────────┘   └────────────────┘  └─────────────────┘          │
+│        │  (OODA)     │   │ Reflexion-     │  │ PlanExecutor    │          │
+│        └─────────────┘   │ Executor       │  └─────────────────┘          │
+│                          │ OutcomeExec.   │                               │
+│                          └────────────────┘                               │
 │                                                                             │
 │   JSONL store  ~/.cache/<app>/events-<stream>.jsonl  (one file per stream) │
 │                ~/.cache/<app>/cursor-<adapter>.json  (adapter cursors)     │
@@ -75,6 +78,16 @@ append-only JSONL log files, with two agent execution models layered on top.
 │                │ sequence. Wire ReActExecutor inside execute_step() for    │
 │                │ tool-using steps. Status: complete / partial / failed.    │
 ├────────────────┼────────────────────────────────────────────────────────────┤
+│ Reflexion-     │ RALF variant. Adds critique() in the same LLM context     │
+│ Executor       │ between act() and learn(). Lowers confidence to force     │
+│                │ another iteration. Extends via _post_act_hook(); does not │
+│                │ duplicate run(). Use for self-critique quality loops.     │
+├────────────────┼────────────────────────────────────────────────────────────┤
+│ Outcome-       │ RALF variant. Adds evaluate(artifact, rubric) in an       │
+│ Executor       │ isolated context (no agent history). Satisfied → complete  │
+│                │ (confidence=1.0); gaps fed back to next act() iteration.  │
+│                │ Mirrors Anthropic Managed Agents grader contract.         │
+├────────────────┼────────────────────────────────────────────────────────────┤
 │ Event          │ Immutable record. stream auto-derived from event_type     │
 │                │ prefix. causation_id + correlation_id for traceability.   │
 │                │ Optional payload["_meta"] (EventMeta) for framework       │
@@ -115,7 +128,9 @@ Reactive pattern. Runs on every subscribed event.
 ```
 
 LLM placement rule: **orient() only** in AgentBase. observe, decide, act are deterministic.
-In executor composition: LLM also lives in `think()` (ReActExecutor) and `plan()` (PlanExecutor) — never in `execute()` or `execute_step()`.
+In executor composition: LLM also lives in `think()` (ReActExecutor), `plan()` (PlanExecutor),
+`critique()` (ReflexionExecutor), and `evaluate()` (OutcomeExecutor) — never in `execute()`,
+`execute_step()`, or `retrieve()`.
 
 ---
 
@@ -297,13 +312,16 @@ ISO string, page token, sequence number, or a set of seen IDs.
 
 ## Planned extensions
 
-### Additional executors (see `docs/idioms-adoption-plan.md`)
+### Executors (see `docs/idioms-adoption-plan.md`)
+
+All executor variants extend `RALFExecutor` via `_post_act_hook()` — never by copying `run()`.
 
 | Executor | File | Pattern | Status |
 |---|---|---|---|
 | `ReActExecutor` | `loops/react.py` | Thought→Action→Observation bounded loop | ✅ Built (2026-05-04) |
 | `PlanExecutor` | `loops/plan.py` | LLM decomposition + per-step execution | ✅ Built (2026-05-04) |
-| `ReflexionExecutor` | `loops/reflexion.py` | RALF + explicit critique phase | ✅ Built (2026-05-05) |
+| `ReflexionExecutor` | `loops/reflexion.py` | RALF + same-context self-critique | ✅ Built (2026-05-05) |
+| `OutcomeExecutor` | `loops/outcome.py` | RALF + rubric-governed isolated evaluation | ✅ Built (2026-05-07) |
 
 ### EventMeta convention (see `CLAUDE.md`)
 

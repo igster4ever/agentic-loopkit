@@ -144,11 +144,13 @@ def create_app(bus: EventBus) -> FastAPI:
 ```python
 # agentic_loopkit/dashboard/dependencies.py
 
-from fastapi import Request
+from starlette.requests import HTTPConnection
 from ..bus import EventBus
 
-def get_bus(request: Request) -> EventBus:
-    return request.app.state.bus
+def get_bus(conn: HTTPConnection) -> EventBus:
+    """Accepts HTTPConnection (base of Request and WebSocket) — works for both
+    HTTP routes and the /ws/tail WebSocket endpoint without duplication."""
+    return conn.app.state.bus
 ```
 
 ---
@@ -333,14 +335,20 @@ On disconnect, the server unsubscribes from the router immediately.
 # agentic_loopkit/dashboard/ws.py
 
 import asyncio, json
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from ..bus import EventBus
 from ..events.models import WILDCARD_STREAM
+from .dependencies import get_bus
 
 router = APIRouter()
 
 @router.websocket("/ws/tail")
-async def live_tail(websocket: WebSocket, stream: str = WILDCARD_STREAM, event_type: str = ""):
-    bus = websocket.app.state.bus
+async def live_tail(
+    websocket:  WebSocket,
+    stream:     str = WILDCARD_STREAM,
+    event_type: str = "",
+    bus:        EventBus = Depends(get_bus),   # same dependency as HTTP routes
+) -> None:
     await websocket.accept()
     queue: asyncio.Queue = asyncio.Queue(maxsize=500)
 
@@ -356,7 +364,7 @@ async def live_tail(websocket: WebSocket, stream: str = WILDCARD_STREAM, event_t
     try:
         while True:
             item = await queue.get()
-            await websocket.send_text(json.dumps(item))
+            await websocket.send_text(json.dumps(item, default=str))
     except WebSocketDisconnect:
         pass
     finally:
@@ -602,7 +610,7 @@ can start the dashboard without writing any code.
    See `EventMeta` spec below.
 
 2. **RALF loop grouping** — **Resolved 2026-05-02.**
-   Use `SystemEventType.LOOP_STARTED` payload: `{"executor_type": "ralf"|"react"|"plan"|"reflexion"}`.
+   Use `SystemEventType.LOOP_STARTED` payload: `{"executor_type": "ralf"|"react"|"plan"|"reflexion"|"outcome"}`.
    Chain builder classifies events by inspecting `_meta.loop_type` where present,
    falling back to `system.loop_started` events in the same correlation chain.
 
@@ -617,7 +625,7 @@ It is **never required** — consumer domain payloads are unaffected.
 Loopkit components (agents, executors) populate it when emitting events.
 
 ```python
-# events/models.py addition — to implement
+# events/models.py — implemented 2026-05-04
 
 @dataclass
 class EventMeta:
@@ -626,7 +634,7 @@ class EventMeta:
     Written to payload["_meta"]. Consumer payload keys are never touched.
     """
     phase:      str   | None = None   # "observe"|"orient"|"decide"|"act"|"think"|"execute"
-    loop_type:  str   | None = None   # "ooda"|"ralf"|"react"|"plan"|"reflexion"
+    loop_type:  str   | None = None   # "ooda"|"ralf"|"react"|"plan"|"reflexion"|"outcome"
     iteration:  int   | None = None   # loop iteration number
     confidence: float | None = None   # confidence score (0.0–1.0)
     context:    str   | None = None   # agent reasoning text → dashboard Context tab

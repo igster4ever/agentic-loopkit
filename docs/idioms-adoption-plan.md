@@ -4,7 +4,7 @@ _Decided: 2026-05-02_
 
 ## Summary
 
-Four harness idioms were evaluated against the loopkit. Three are adopted; one deferred.
+Five harness idioms were evaluated against the loopkit. Four are adopted; one deferred.
 The OODA+ReAct composition pattern is documented as the canonical wiring example.
 
 ---
@@ -16,6 +16,7 @@ The OODA+ReAct composition pattern is documented as the canonical wiring example
 | ReAct (Thought→Action→Observation) | **Build** | `loops/react.py` | 1 | ✅ Built 2026-05-04 |
 | Plan-and-Execute | **Build** | `loops/plan.py` | 2 | ✅ Built 2026-05-04 |
 | Reflexion | **Build** | `loops/reflexion.py` | 3 | ✅ Built 2026-05-05 |
+| Outcome (rubric-governed evaluation) | **Build** | `loops/outcome.py` | 4 | ✅ Built 2026-05-07 |
 | Tree-of-Thoughts | **Defer** | — | Out of scope v1 | Deferred |
 | OODA+ReAct composition | **Document** | CLAUDE.md + architecture.md | — | ✅ Done 2026-05-02 |
 
@@ -185,11 +186,73 @@ class ReflexionExecutor(RALFExecutor):
 - **Extends `RALFExecutor`** rather than standalone — the loop machinery (bounded iteration,
   confidence rejection, follow_up) is identical; only the step interior changes. Avoids
   duplicating ~60 lines of loop infrastructure.
-- `run()` is overridden to inject `critique()` between `act()` and `learn()`.
+- **`_post_act_hook()` is overridden**, not `run()`. `critique()` is wired in via the hook —
+  `run()` is never copied. This is the canonical extension pattern for all RALF variants.
 
 ---
 
-## 4. Tree-of-Thoughts — deferred
+## 4. OutcomeExecutor
+
+**Location:** `agentic_loopkit/loops/outcome.py`
+
+RALF variant. Adds a rubric and an isolated `evaluate()` phase via `_post_act_hook()`.
+Mirrors the Anthropic Managed Agents grader contract: the evaluator sees only the artifact
+and rubric — never the agent's reasoning history — preventing anchoring bias.
+
+### Abstract interface
+
+```python
+class OutcomeExecutor(RALFExecutor):
+    """
+    RALFExecutor + rubric-governed isolated evaluation.
+
+    Loop: retrieve → [act → evaluate] × max_iterations → follow_up
+    evaluate() receives (artifact, rubric) only — no agent reasoning history.
+    """
+    max_iterations: int = 3   # matches Anthropic Managed Agents default
+
+    @property
+    @abstractmethod
+    def rubric(self) -> str:
+        """Markdown criteria. Explicit and gradeable — not vague."""
+
+    @abstractmethod
+    async def evaluate(
+        self, artifact: Any, rubric: str
+    ) -> tuple[bool, list[str]]:
+        """
+        EVALUATE — isolated context only.
+        Returns (satisfied, gaps).
+        Satisfied → status="complete", confidence=1.0.
+        Gaps → fed to next act() via prior_result.output.
+        """
+```
+
+### Design decisions
+
+- **Isolated evaluation context** — `evaluate()` must call the LLM with only `(artifact, rubric)`,
+  no prior chain. This is the key distinction from `ReflexionExecutor.critique()`, which runs in
+  the same context as `act()` and may rationalise the agent's own choices.
+- **Extends `RALFExecutor` via `_post_act_hook()`** — same extension pattern as ReflexionExecutor.
+  Neither executor duplicates `run()`.
+- **`satisfied=True` sets `confidence=1.0`** — overrides whatever confidence `act()` returned.
+  The rubric verdict supersedes self-assessed confidence.
+- **Gap feedback in `prior_result.output`** — when not satisfied, the gaps are prepended to the
+  previous artifact in `prior_result.output` so the next `act()` iteration has clear revision context.
+- **`max_iterations = 3` default** — matches the Anthropic Managed Agents default (max 20).
+
+### Comparison with ReflexionExecutor
+
+| | `ReflexionExecutor` | `OutcomeExecutor` |
+|---|---|---|
+| Evaluation context | Same as `act()` (full history) | Isolated (`artifact + rubric` only) |
+| Evaluation type | Self-critique | External rubric grader |
+| Anchoring risk | Present | Eliminated by design |
+| Use case | Iterative quality improvement | Outcome-gate against explicit criteria |
+
+---
+
+## 5. Tree-of-Thoughts — deferred
 
 High complexity, niche use case. Requires branching state management and a scoring/pruning
 function that doesn't map to the loopkit's linear bounded-loop model. Revisit post-v1.
@@ -225,6 +288,7 @@ Add to `agentic_loopkit/__init__.py` as each executor is implemented:
 from .loops.react import ReActExecutor, ReActResult, ReActStep
 from .loops.plan import PlanExecutor, PlanResult, PlanStep
 from .loops.reflexion import ReflexionExecutor
+from .loops.outcome import OutcomeExecutor
 ```
 
 ---
@@ -233,9 +297,10 @@ from .loops.reflexion import ReflexionExecutor
 
 1. ✅ `loops/react.py` — ReActExecutor + tests (2026-05-04)
 2. ✅ `loops/plan.py` — PlanExecutor + tests (2026-05-04)
-3. ✅ `loops/reflexion.py` — ReflexionExecutor + tests (2026-05-05)
-4. ✅ Update `CLAUDE.md` and `docs/architecture.md` with composition pattern (2026-05-02, updated 2026-05-04)
-5. ✅ Update `__init__.py` exports after each (ongoing)
+3. ✅ `loops/reflexion.py` — ReflexionExecutor + tests; `_post_act_hook()` extension point added to RALFExecutor (2026-05-05)
+4. ✅ `loops/outcome.py` — OutcomeExecutor + tests; rubric-governed isolated evaluation (2026-05-07)
+5. ✅ Update `CLAUDE.md` and `docs/architecture.md` with composition pattern (2026-05-02, updated 2026-05-07)
+6. ✅ Update `__init__.py` exports after each (ongoing)
 
 ---
 
