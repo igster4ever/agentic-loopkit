@@ -238,6 +238,20 @@ from agentic_loopkit import (
 )
 ```
 
+## Documentation hygiene
+
+After any session that adds executors, changes the public API surface, or modifies
+implementation details (adapters, bus, dashboard routes): review `/docs` before committing.
+
+Check:
+- `docs/architecture.md` — component roles table, LLM placement rule, executors table
+- `docs/idioms-adoption-plan.md` — decision table, executor section, implementation order, Public API additions
+- `docs/dashboard-architecture.md` — code sketches, enum values (`loop_type`, `executor_type`)
+
+A five-minute review at commit time prevents a session of stale-docs archaeology later.
+
+---
+
 ## Key design rules
 
 - **LLM is not the orchestrator** — it's called inside `orient()` (OODA), `act()` (RALF), `think()` (ReAct), `plan()` (PlanExecutor), `act()`/`critique()` (ReflexionExecutor), and `act()`/`evaluate()` (OutcomeExecutor) only
