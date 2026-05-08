@@ -37,7 +37,18 @@ agentic_loopkit/
     └── git.py               # LocalGitAdapter + GitEventType — polls local git repo via subprocess
 
 dashboard/
-└── (ui/ planned) — Bun + Vite + React frontend (not yet built)
+└── ui/                           # Bun + Vite + React 19 + TypeScript (scaffolded 2026-05-08)
+    ├── package.json              # bun runtime; vite dev server
+    ├── vite.config.ts            # Tailwind v4 plugin; /api + /ws proxy to :8765
+    ├── src/
+    │   ├── main.tsx
+    │   ├── App.tsx               # state-based routing shell
+    │   ├── types/events.ts       # TypeScript mirror of Python Event dataclass
+    │   ├── stores/               # Zustand: graph.ts, filters.ts, livetail.ts
+    │   ├── hooks/                # useApi.ts, useEventStream.ts (WS + backoff)
+    │   ├── components/           # Sidebar, EventTable, LiveTail
+    │   └── pages/                # StreamsPage, EventsPage, AgentsPage, AdaptersPage
+    └── dist/                     # gitignored; bun run build → served by FastAPI
 
 agentic_loopkit/dashboard/           # Optional FastAPI management API (pip install agentic-loopkit[dashboard])
 ├── __init__.py              # exports create_app(bus) → FastAPI
@@ -101,7 +112,7 @@ payload = {
 }
 ```
 
-Fields: `phase`, `loop_type` (`"ooda"|"ralf"|"react"|"plan"|"reflexion"`), `iteration`, `confidence`, `context`, `tags`.
+Fields: `phase`, `loop_type` (`"ooda"|"ralf"|"react"|"plan"|"reflexion"|"outcome"`), `iteration`, `confidence`, `context`, `tags`.
 All fields optional. `to_dict()` omits None fields and empty tag lists.
 Read back via `event.meta()` — returns the `_meta` dict or `None` if absent.
 The dashboard renders `payload["_meta"]["context"]` in the Context tab.
@@ -247,6 +258,7 @@ Check:
 - `docs/architecture.md` — component roles table, LLM placement rule, executors table
 - `docs/idioms-adoption-plan.md` — decision table, executor section, implementation order, Public API additions
 - `docs/dashboard-architecture.md` — code sketches, enum values (`loop_type`, `executor_type`)
+- `docs/dashboard-stack.md` — layer diagram; update if routes, bindings, or WS lifecycle change
 
 A five-minute review at commit time prevents a session of stale-docs archaeology later.
 
@@ -421,4 +433,11 @@ Install with: `pip install agentic-loopkit[dashboard]`
 - `GET /api/adapters` — registered adapters + cursor state
 - `WS /ws/tail` — live event stream with stream/event_type filtering
 
-**Frontend — not yet built.** Full spec: `docs/dashboard-architecture.md`
+**Frontend — scaffolded (2026-05-08):** `dashboard/ui/` — React 19 + Vite + Bun + TypeScript.
+All REST endpoints wired (StreamsPage, EventsPage, AgentsPage, AdaptersPage). WS live-tail
+working via `useEventStream` hook with exponential backoff. Build clean: `bun run build` outputs
+to `dashboard/ui/dist/` — FastAPI serves it from there automatically.
+
+Not yet built: `EventChainGraph` (DAG via @xyflow/react), `EventDetailPanel` (payload + context
+tab), `EventTimeline` (Recharts scatter). Full spec: `docs/dashboard-architecture.md`.
+Stack diagram: `docs/dashboard-stack.md`.
