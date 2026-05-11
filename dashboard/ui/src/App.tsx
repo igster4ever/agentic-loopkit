@@ -4,6 +4,7 @@ import { StreamsPage }  from './pages/StreamsPage';
 import { EventsPage }   from './pages/EventsPage';
 import { AgentsPage }   from './pages/AgentsPage';
 import { AdaptersPage } from './pages/AdaptersPage';
+import { ChainPage }    from './pages/ChainPage';
 import { LiveTail }     from './components/livetail/LiveTail';
 
 function App() {
@@ -12,11 +13,12 @@ function App() {
   const navigate = (href: string) => setPath(href);
 
   const view = (() => {
-    if (path === '/streams')  return <StreamsPage />;
-    if (path === '/events')   return <EventsPage onNavigate={navigate} />;
-    if (path === '/live')     return <LiveTail />;
-    if (path === '/agents')   return <AgentsPage />;
-    if (path === '/adapters') return <AdaptersPage />;
+    if (path === '/streams')          return <StreamsPage />;
+    if (path === '/events')           return <EventsPage onNavigate={navigate} />;
+    if (path === '/live')             return <LiveTail />;
+    if (path === '/agents')           return <AgentsPage />;
+    if (path === '/adapters')         return <AdaptersPage />;
+    if (path.startsWith('/chains/'))  return <ChainPage correlationId={path.slice(8)} onNavigate={navigate} />;
     return (
       <div className="p-6 text-zinc-500 text-sm">
         View <code className="text-zinc-400">{path}</code> not yet implemented.

@@ -37,17 +37,22 @@ agentic_loopkit/
     └── git.py               # LocalGitAdapter + GitEventType — polls local git repo via subprocess
 
 dashboard/
-└── ui/                           # Bun + Vite + React 19 + TypeScript (scaffolded 2026-05-08)
-    ├── package.json              # bun runtime; vite dev server
+└── ui/                           # Bun + Vite + React 19 + TypeScript (built 2026-05-11)
+    ├── package.json              # bun runtime; vite dev server; dagre + @xyflow/react + recharts
     ├── vite.config.ts            # Tailwind v4 plugin; /api + /ws proxy to :8765
     ├── src/
     │   ├── main.tsx
-    │   ├── App.tsx               # state-based routing shell
-    │   ├── types/events.ts       # TypeScript mirror of Python Event dataclass
+    │   ├── App.tsx               # state-based routing shell; /chains/:id route wired
+    │   ├── types/events.ts       # TypeScript mirror of Python Event dataclass (incl. trust_level, delegation_depth)
     │   ├── stores/               # Zustand: graph.ts, filters.ts, livetail.ts
     │   ├── hooks/                # useApi.ts, useEventStream.ts (WS + backoff)
-    │   ├── components/           # Sidebar, EventTable, LiveTail
-    │   └── pages/                # StreamsPage, EventsPage, AgentsPage, AdaptersPage
+    │   ├── components/
+    │   │   ├── graph/            # EventChainGraph.tsx — @xyflow/react DAG, dagre layout, node colour coding
+    │   │   ├── layout/           # Sidebar.tsx, EventDetailPanel.tsx (payload + context tab)
+    │   │   ├── table/            # EventTable.tsx
+    │   │   ├── timeline/         # EventTimeline.tsx — Recharts scatter (time × stream)
+    │   │   └── livetail/         # LiveTail.tsx
+    │   └── pages/                # StreamsPage (+ timeline), EventsPage, ChainPage, AgentsPage, AdaptersPage
     └── dist/                     # gitignored; bun run build → served by FastAPI
 
 agentic_loopkit/dashboard/           # Optional FastAPI management API (pip install agentic-loopkit[dashboard])
@@ -62,17 +67,27 @@ agentic_loopkit/dashboard/           # Optional FastAPI management API (pip inst
     ├── agents.py            # GET /api/agents
     └── adapters.py          # GET /api/adapters
 
+agentic_govkit/                  # Governance layer (pip install agentic-loopkit[governance])
+├── __init__.py              # exports AuditAgent, GovernanceEventType
+├── agents/
+│   └── audit.py             # AuditAgent — OODA wildcard observer; emits governance.* events
+└── events/
+    └── models.py            # GovernanceEventType StrEnum (governance.* stream)
+
 docs/
 ├── architecture.md          # Logical architecture, component roles, data flow (ASCII diagrams)
 ├── idioms-adoption-plan.md  # ReActExecutor / PlanExecutor / ReflexionExecutor design decisions
-└── dashboard-architecture.md # FastAPI management API + Bun/React dashboard spec
+├── dashboard-architecture.md # FastAPI management API + Bun/React dashboard spec
+├── dashboard-stack.md       # Logical layer diagram: browser / FastAPI / loopkit runtime / JSONL
+└── event-catalog.md         # All event types by module; module communication contract; trust levels
 
 tests/
-├── events/                  # test_models (incl. EventMeta), test_router, test_store
+├── events/                  # test_models (incl. EventMeta, TrustLevel, delegation_depth), test_router, test_store
 ├── agents/                  # test_base (OODA pipeline)
-├── loops/                   # test_ralf, test_react, test_plan, test_reflexion
+├── loops/                   # test_ralf, test_react, test_plan, test_reflexion, test_outcome
 ├── adapters/                # test_base (PollingAdapter), test_clickup, test_slack, test_git
-└── dashboard/               # test_routes_streams, test_routes_events, test_routes_chains, test_routes_agents_adapters
+├── dashboard/               # test_routes_streams, test_routes_events, test_routes_chains, test_routes_agents_adapters
+└── govkit/                  # test_module_boundaries, test_audit_agent
 ```
 
 ## Core concepts
@@ -90,11 +105,14 @@ event = Event(event_type=MyEventType.THING_HAPPENED, source="my-service", payloa
 # event.stream == "things"
 ```
 
-Traceability fields on every Event:
+Traceability and governance fields on every Event:
 - `causation_id` — event_id of the direct cause (chain tracing)
 - `correlation_id` — business workflow ID shared by all events in a flow
+- `trust_level: TrustLevel` — declared trust level of the source; defaults to `TrustLevel.MEDIUM`
+- `delegation_depth: int` — hop count from the root event; defaults to `0`
 
-Use `event.caused("child.type", "source", payload)` to create a child that inherits correlation_id.
+Use `event.caused("child.type", "source", payload)` to create a child that inherits `correlation_id`,
+inherits `trust_level`, and auto-increments `delegation_depth` by 1.
 
 **EventMeta convention** (implemented 2026-05-04):
 Loopkit components emit structured framework metadata via a reserved `payload["_meta"]` key.
@@ -225,7 +243,7 @@ from agentic_loopkit import (
     # Bus
     EventBus,
     # Events
-    Event, EventMeta, SystemEventType, WILDCARD_STREAM,
+    Event, EventMeta, SystemEventType, TrustLevel, WILDCARD_STREAM,
     EventRouter, Subscriber,
     append_event, load_events,
     # Agents
@@ -252,13 +270,14 @@ from agentic_loopkit import (
 ## Documentation hygiene
 
 After any session that adds executors, changes the public API surface, or modifies
-implementation details (adapters, bus, dashboard routes): review `/docs` before committing.
+implementation details (adapters, bus, dashboard routes, governance): review `/docs` before committing.
 
 Check:
-- `docs/architecture.md` — component roles table, LLM placement rule, executors table
+- `docs/architecture.md` — component roles table, LLM placement rule, executors table, Event model fields
 - `docs/idioms-adoption-plan.md` — decision table, executor section, implementation order, Public API additions
-- `docs/dashboard-architecture.md` — code sketches, enum values (`loop_type`, `executor_type`)
+- `docs/dashboard-architecture.md` — code sketches, enum values (`loop_type`, `executor_type`), TypeScript Event type
 - `docs/dashboard-stack.md` — layer diagram; update if routes, bindings, or WS lifecycle change
+- `docs/event-catalog.md` — update when adding event types to either loopkit or govkit modules
 
 A five-minute review at commit time prevents a session of stale-docs archaeology later.
 
@@ -272,6 +291,7 @@ A five-minute review at commit time prevents a session of stale-docs archaeology
 - **Adapters are not agents** — no reasoning, no LLM calls; deduplicate + emit only
 - **Open EventType** — loopkit never imports consumer event types; consumers own their domain enums
 - **Zero runtime deps** — stdlib only; `aiohttp` is consumer-supplied for ClickUpAdapter
+- **Observability before enforcement** — governance is a participant layer on the bus, not a wrapper around it; all audit decisions are themselves events
 
 ## OODA + ReAct composition pattern
 
@@ -394,6 +414,8 @@ Register: `bus.register(MyAgent("my-agent", bus))`; subscribe: `agent.subscribe(
 
 Stream wildcard `"*"` loads all stream files when calling `load_events()`.
 
+Note: governance events land on `events-governance.jsonl` alongside all other streams.
+
 ## Tests
 
 ```bash
@@ -401,7 +423,7 @@ Stream wildcard `"*"` loads all stream files when calling `load_events()`.
 # Note: system Python is blocked by PEP 668 on macOS — always use .venv/bin/python
 ```
 
-243 tests, all passing (as of 2026-05-07). Coverage: EventBus, EventRouter, EventStore,
+262 tests, all passing (as of 2026-05-11). Coverage: EventBus, EventRouter, EventStore,
 AgentBase (all OODA short-circuit paths), RALFExecutor (confidence rejection, learn, follow-up,
 _post_act_hook extension), ReActExecutor (happy path, max_steps, error handling, on_step hook,
 follow-up), PlanExecutor (all-complete, partial, failed, plan() raises, step exception recovery,
@@ -411,12 +433,16 @@ OutcomeExecutor (evaluate called with artifact+rubric only, satisfied first-pass
 loop, gaps fed to next act() via prior_result, learn sequence, max_iterations, follow_up,
 isolation contract — evaluate signature verified, default max_iterations=3),
 EventMeta (to_dict field omission, event.meta() helper),
+TrustLevel + delegation_depth (Event defaults, round-trip serialisation, caused() propagation),
 PollingAdapter (cursor, error event), ClickUpAdapter (payload mapping, dedup, cursor),
 SlackAdapter (event mapping, per-channel cursor, pagination, rate-limit handling),
 LocalGitAdapter (git log parsing, SHA cursor, first-run since window, real-repo integration),
 dashboard routes (streams, events filter/pagination, events/{id} + related chain, chains DAG +
 summary, agents, adapters), dashboard chain builder (edge derivation, summary.status logic),
-dashboard WS /ws/tail (connect/disconnect, stream filter, router lifecycle, queue-full drop).
+dashboard WS /ws/tail (connect/disconnect, stream filter, router lifecycle, queue-full drop),
+AuditAgent (OODA pipeline, depth exceeded, trust escalation, combined flags, governance event
+payload, EventMeta in governance events, self-exclusion of governance stream),
+module boundaries (govkit→loopkit one-way, loopkit→govkit zero, governance stream namespace).
 
 ## Dashboard
 
@@ -433,11 +459,79 @@ Install with: `pip install agentic-loopkit[dashboard]`
 - `GET /api/adapters` — registered adapters + cursor state
 - `WS /ws/tail` — live event stream with stream/event_type filtering
 
-**Frontend — scaffolded (2026-05-08):** `dashboard/ui/` — React 19 + Vite + Bun + TypeScript.
-All REST endpoints wired (StreamsPage, EventsPage, AgentsPage, AdaptersPage). WS live-tail
-working via `useEventStream` hook with exponential backoff. Build clean: `bun run build` outputs
-to `dashboard/ui/dist/` — FastAPI serves it from there automatically.
+**Frontend — complete (2026-05-11):** `dashboard/ui/` — React 19 + Vite + Bun + TypeScript.
+All REST endpoints wired. WS live-tail working. Build clean.
 
-Not yet built: `EventChainGraph` (DAG via @xyflow/react), `EventDetailPanel` (payload + context
-tab), `EventTimeline` (Recharts scatter). Full spec: `docs/dashboard-architecture.md`.
-Stack diagram: `docs/dashboard-stack.md`.
+Built components:
+- `EventChainGraph` — dagre-laid-out DAG via `@xyflow/react`; nodes colour-coded by source type; selected node highlights; `EventMeta` phase + loop_type in node subtitle
+- `EventDetailPanel` — right panel (320px); Payload tab (JSON, `_meta` excluded) + Context tab (`_meta.context`); `_meta` strip with phase/loop/confidence pills; close button
+- `EventTimeline` — Recharts scatter (time × stream); fetches last 300 events; shown on StreamsPage
+- `ChainPage` — `/chains/:id` route; breadcrumb + status badge; graph + detail panel flex layout; clears store on unmount
+
+Full spec: `docs/dashboard-architecture.md`. Stack diagram: `docs/dashboard-stack.md`.
+
+## Governance layer (agentic_govkit)
+
+Separate top-level package in the same repo. Depends on `agentic_loopkit` (one-way).
+Install alongside loopkit: `pip install agentic-loopkit[governance]` (no extra runtime deps).
+
+### Architecture
+
+```
+agentic_govkit        →  agentic_loopkit  (public API only)
+agentic_loopkit       →  agentic_govkit   (NEVER — enforced by test)
+inter-module comms    →  published Events only (never direct calls)
+```
+
+### AuditAgent
+
+Wildcard observer. Subscribes to all streams at init; never audits `governance.*` (prevents loops).
+Emits structured governance events when thresholds are breached — the auditor is itself observable.
+
+```python
+from agentic_govkit import AuditAgent, GovernanceEventType
+from agentic_loopkit import EventBus, WILDCARD_STREAM
+
+audit = AuditAgent("audit", bus, max_delegation_depth=5)
+# subscribes to WILDCARD_STREAM automatically
+bus.register(audit)
+```
+
+Flags raised as events on the `governance` stream:
+- `governance.depth_exceeded` — `delegation_depth > max_delegation_depth`
+- `governance.trust_escalation` — `trust_level == TrustLevel.UNTRUSTED`
+- `governance.audit_flagged` — generic policy flag (reserved for future rules)
+
+### TrustLevel
+
+`TrustLevel` is a `StrEnum` on `agentic_loopkit.events.models`. Sources self-declare.
+
+| Level | Meaning | AuditAgent |
+|---|---|---|
+| `HIGH` | Fully trusted internal component | No flag |
+| `MEDIUM` | Default — standard agent | No flag |
+| `LOW` | External / partially trusted | No flag (informational) |
+| `UNTRUSTED` | Known-hostile or unverified | → `governance.trust_escalation` |
+
+### delegation_depth
+
+`Event.delegation_depth` increments by 1 on every `event.caused(...)` call.
+Root events start at 0. Use to detect runaway delegation chains.
+`AuditAgent` flags events where `delegation_depth > max_delegation_depth` (default: 5).
+
+## Module boundary conventions (Modulith-inspired)
+
+Adopted from Spring Modulith's modular monolith principles. Apply whenever a new module
+is added to this repo.
+
+**Rules:**
+1. Each top-level package (`agentic_loopkit`, `agentic_govkit`) is a module with a declared public surface in its `__init__.py`
+2. Cross-module imports are allowed only from the target module's `__init__.py` — never from private submodules (`from agentic_loopkit._internal import X` is forbidden)
+3. Inter-module communication is via published `Event` objects on the shared bus — never direct method calls across module boundaries
+4. Dependencies are one-way: govkit → loopkit; loopkit has zero govkit imports
+5. Module tests are isolated — govkit fixtures initialise only govkit components + a minimal EventBus
+
+**Enforcement:** `tests/govkit/test_module_boundaries.py` catches import leaks at CI time via `grep`.
+Update this test when adding new modules.
+
+**Event catalog:** `docs/event-catalog.md` — update when adding event types to any module.

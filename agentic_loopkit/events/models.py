@@ -39,6 +39,24 @@ class SystemEventType(StrEnum):
     LOOP_REJECTED   = "system.loop_rejected"
 
 
+class TrustLevel(StrEnum):
+    """
+    Declared trust level for an event's source.
+
+    Sources self-declare their trust level when emitting events.
+    Governance agents (e.g. AuditAgent) use this field to make routing
+    and flagging decisions without inspecting source internals.
+
+    Hierarchy: HIGH > MEDIUM > LOW > UNTRUSTED
+
+    UNTRUSTED events are flagged by AuditAgent regardless of other conditions.
+    """
+    HIGH      = "high"
+    MEDIUM    = "medium"
+    LOW       = "low"
+    UNTRUSTED = "untrusted"
+
+
 WILDCARD_STREAM = "*"  # subscribe to all streams
 
 
@@ -101,14 +119,16 @@ class Event:
     correlation_id — business workflow identifier shared by all events in a flow
     """
 
-    event_type:     str
-    source:         str
-    payload:        dict[str, Any]
-    stream:         str            = ""
-    event_id:       str            = field(default_factory=lambda: str(uuid.uuid4()))
-    timestamp:      datetime       = field(default_factory=lambda: datetime.now(tz=timezone.utc))
-    causation_id:   Optional[str]  = None
-    correlation_id: Optional[str]  = None
+    event_type:       str
+    source:           str
+    payload:          dict[str, Any]
+    stream:           str            = ""
+    event_id:         str            = field(default_factory=lambda: str(uuid.uuid4()))
+    timestamp:        datetime       = field(default_factory=lambda: datetime.now(tz=timezone.utc))
+    causation_id:     Optional[str]  = None
+    correlation_id:   Optional[str]  = None
+    trust_level:      TrustLevel     = TrustLevel.MEDIUM
+    delegation_depth: int            = 0
 
     def __post_init__(self) -> None:
         if not self.stream:
@@ -118,37 +138,43 @@ class Event:
 
     def to_dict(self) -> dict:
         return {
-            "event_id":       self.event_id,
-            "event_type":     str(self.event_type),
-            "stream":         self.stream,
-            "source":         self.source,
-            "timestamp":      _iso(self.timestamp),
-            "payload":        self.payload,
-            "causation_id":   self.causation_id,
-            "correlation_id": self.correlation_id,
+            "event_id":         self.event_id,
+            "event_type":       str(self.event_type),
+            "stream":           self.stream,
+            "source":           self.source,
+            "timestamp":        _iso(self.timestamp),
+            "payload":          self.payload,
+            "causation_id":     self.causation_id,
+            "correlation_id":   self.correlation_id,
+            "trust_level":      str(self.trust_level),
+            "delegation_depth": self.delegation_depth,
         }
 
     @classmethod
     def from_dict(cls, d: dict) -> "Event":
         return cls(
-            event_id       = d["event_id"],
-            event_type     = d["event_type"],   # kept as plain string on load
-            stream         = d["stream"],
-            source         = d["source"],
-            timestamp      = _parse(d["timestamp"]),
-            payload        = d.get("payload", {}),
-            causation_id   = d.get("causation_id"),
-            correlation_id = d.get("correlation_id"),
+            event_id         = d["event_id"],
+            event_type       = d["event_type"],   # kept as plain string on load
+            stream           = d["stream"],
+            source           = d["source"],
+            timestamp        = _parse(d["timestamp"]),
+            payload          = d.get("payload", {}),
+            causation_id     = d.get("causation_id"),
+            correlation_id   = d.get("correlation_id"),
+            trust_level      = TrustLevel(d.get("trust_level", TrustLevel.MEDIUM)),
+            delegation_depth = int(d.get("delegation_depth", 0)),
         )
 
     def caused(self, event_type: str, source: str, payload: dict) -> "Event":
         """Convenience: create a child event that traces back to this one."""
         return Event(
-            event_type     = event_type,
-            source         = source,
-            payload        = payload,
-            causation_id   = self.event_id,
-            correlation_id = self.correlation_id,
+            event_type       = event_type,
+            source           = source,
+            payload          = payload,
+            causation_id     = self.event_id,
+            correlation_id   = self.correlation_id,
+            trust_level      = self.trust_level,
+            delegation_depth = self.delegation_depth + 1,
         )
 
     def meta(self) -> Optional[dict[str, Any]]:

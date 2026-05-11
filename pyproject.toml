@@ -36,6 +36,8 @@ Homepage   = "https://github.com/igster4ever/agentic-loopkit"
 Repository = "https://github.com/igster4ever/agentic-loopkit"
 
 [project.optional-dependencies]
+governance = []   # agentic-govkit — no extra runtime deps; depends only on agentic-loopkit
+
 dashboard = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
@@ -52,7 +54,7 @@ dev = [
 # Uncomment when agentic_loopkit/dashboard/__main__.py is implemented.
 
 [tool.hatch.build.targets.wheel]
-packages = ["agentic_loopkit"]
+packages = ["agentic_loopkit", "agentic_govkit"]
 
 [tool.hatch.build.targets.sdist]
 exclude = [

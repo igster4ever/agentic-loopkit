@@ -67,13 +67,11 @@ agentic-loopkit/
 │           └── components/
 │               ├── layout/
 │               │   ├── Sidebar.tsx            # nav + filter controls
-│               │   └── EventDetailPanel.tsx   # right panel: payload, chain, context
+│               │   └── EventDetailPanel.tsx   # right panel: payload JSON + context tab ✅ 2026-05-11
 │               ├── graph/
-│               │   ├── EventChainGraph.tsx    # @xyflow/react DAG
-│               │   ├── EventNode.tsx          # custom node: type badge, timestamp, source
-│               │   └── layout.ts              # dagre auto-layout for causation graph
+│               │   └── EventChainGraph.tsx    # @xyflow/react DAG; dagre layout ✅ 2026-05-11
 │               ├── timeline/
-│               │   └── EventTimeline.tsx      # Recharts scatter — time × stream
+│               │   └── EventTimeline.tsx      # Recharts scatter — time × stream ✅ 2026-05-11
 │               ├── table/
 │               │   └── EventTable.tsx         # filterable event list
 │               └── livetail/
@@ -314,14 +312,16 @@ Each message from server → client is a single JSON-serialised Event:
 
 ```json
 {
-  "event_id":       "...",
-  "event_type":     "clickup.task.created",
-  "stream":         "clickup",
-  "source":         "ClickUpAdapter",
-  "timestamp":      "2026-05-02T10:15:42Z",
-  "payload":        {...},
-  "causation_id":   null,
-  "correlation_id": "a2f8e7b1-..."
+  "event_id":         "...",
+  "event_type":       "clickup.task.created",
+  "stream":           "clickup",
+  "source":           "ClickUpAdapter",
+  "timestamp":        "2026-05-02T10:15:42Z",
+  "payload":          {...},
+  "causation_id":     null,
+  "correlation_id":   "a2f8e7b1-...",
+  "trust_level":      "medium",
+  "delegation_depth": 0
 }
 ```
 
@@ -381,7 +381,7 @@ async def live_tail(
 |---|---|---|
 | Runtime / package manager | Bun | User preference; faster installs |
 | Dev server / bundler | Vite | Mature React plugin ecosystem; Bun-compatible |
-| UI framework | React 18 + TypeScript | — |
+| UI framework | React 19 + TypeScript | — |
 | Components | shadcn/ui + Tailwind | Pre-styled Radix primitives; dark mode built-in; copy-paste, no runtime overhead |
 | Graph / DAG | @xyflow/react (React Flow v12) | Best-in-class interactive DAG; dagre auto-layout |
 | Timeline / scatter | Recharts | Lightweight, React-native, Bun/Vite-compatible |
@@ -394,14 +394,16 @@ async def live_tail(
 // src/types/events.ts — mirrors Python Event dataclass exactly
 
 export interface Event {
-  event_id:       string;
-  event_type:     string;
-  stream:         string;
-  source:         string;
-  timestamp:      string;   // ISO 8601 UTC
-  payload:        Record<string, unknown>;
-  causation_id:   string | null;
-  correlation_id: string | null;
+  event_id:         string;
+  event_type:       string;
+  stream:           string;
+  source:           string;
+  timestamp:        string;   // ISO 8601 UTC
+  payload:          Record<string, unknown>;
+  causation_id:     string | null;
+  correlation_id:   string | null;
+  trust_level:      'high' | 'medium' | 'low' | 'untrusted';  // TrustLevel
+  delegation_depth: number;
 }
 
 export interface ChainEdge {

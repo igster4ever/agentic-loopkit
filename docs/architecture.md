@@ -90,6 +90,9 @@ executor patterns layered on top.
 ├────────────────┼────────────────────────────────────────────────────────────┤
 │ Event          │ Immutable record. stream auto-derived from event_type     │
 │                │ prefix. causation_id + correlation_id for traceability.   │
+│                │ trust_level (TrustLevel enum) + delegation_depth (int)    │
+│                │ for governance observability. caused() auto-increments    │
+│                │ delegation_depth and inherits trust_level.                │
 │                │ Optional payload["_meta"] (EventMeta) for framework       │
 │                │ metadata — phase, loop_type, confidence, context.         │
 └────────────────┴────────────────────────────────────────────────────────────┘
@@ -192,15 +195,20 @@ Bounded task execution. Triggered once by an incoming Event; may run up to `max_
 
 ```
   Event {
-    event_id:       uuid4           ─── unique identifier
-    event_type:     str             ─── "<stream>.<action>"  e.g. "gps.cycle_complete"
-    stream:         str             ─── auto-derived: event_type.split(".")[0]
-    source:         str             ─── emitting component name
-    timestamp:      datetime (UTC)
-    payload:        dict
-    causation_id:   str | None      ─── event_id of direct cause
-    correlation_id: str | None      ─── business workflow ID (e.g. ClickUp task ID)
+    event_id:         uuid4           ─── unique identifier
+    event_type:       str             ─── "<stream>.<action>"  e.g. "gps.cycle_complete"
+    stream:           str             ─── auto-derived: event_type.split(".")[0]
+    source:           str             ─── emitting component name
+    timestamp:        datetime (UTC)
+    payload:          dict
+    causation_id:     str | None      ─── event_id of direct cause
+    correlation_id:   str | None      ─── business workflow ID (e.g. ClickUp task ID)
+    trust_level:      TrustLevel      ─── declared source trust; default MEDIUM
+    delegation_depth: int             ─── hop count from root; auto-incremented by caused()
   }
+
+  TrustLevel: HIGH | MEDIUM (default) | LOW | UNTRUSTED
+  delegation_depth: root=0; event.caused() → depth+1, trust_level inherited
 ```
 
 Causal chain example:
@@ -343,11 +351,25 @@ Read back via `event.meta()` — returns the dict or `None` if absent.
 `agentic_loopkit/dashboard/` — optional FastAPI management API.
 Install via `pip install agentic-loopkit[dashboard]`.
 
-**Backend API skeleton built (2026-05-05):** `create_app(bus)` factory,
+**Backend built (2026-05-05):** `create_app(bus)` factory,
 GET `/api/streams`, `/api/events`, `/api/events/{id}`, `/api/chains/{correlation_id}`,
 `/api/agents`, `/api/adapters`, WS `/ws/tail` live-tail endpoint.
 
-**Frontend (Bun/Vite/React) — not yet built.** Spec in `docs/dashboard-architecture.md`.
+**Frontend built (2026-05-11):** `dashboard/ui/` — React 19 + Vite + Bun + TypeScript.
+EventChainGraph (dagre DAG), EventDetailPanel (payload + context tab),
+EventTimeline (Recharts scatter), ChainPage (`/chains/:id`). Spec in `docs/dashboard-architecture.md`.
+
+### Governance layer (see `docs/event-catalog.md`)
+
+`agentic_govkit/` — separate top-level package in same repo. Zero extra runtime deps.
+Install via `pip install agentic-loopkit[governance]`.
+
+- **`AuditAgent`** — subscribes to all streams (`WILDCARD_STREAM`); emits `governance.*` events when
+  `delegation_depth > max_delegation_depth` or `trust_level == UNTRUSTED`. All decisions are
+  themselves events on the bus — the auditor is fully observable.
+- **`GovernanceEventType`** — `governance.depth_exceeded`, `governance.trust_escalation`, `governance.audit_flagged`
+- **Module boundary contract**: `agentic_govkit → agentic_loopkit` (public API only); never reversed.
+  Enforced by `tests/govkit/test_module_boundaries.py`.
 
 ---
 
