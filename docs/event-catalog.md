@@ -21,6 +21,15 @@ Update this file when adding new event types to either module.
 | `system.loop_complete` | executors | downstream agents |
 | `system.loop_rejected` | executors (confidence < 0.40) | retry / escalation agents |
 
+### `projection.*` — Live document materialisation
+
+| Event type | Published by | Condition | Typical subscribers |
+|---|---|---|---|
+| `projection.updated` | `ProjectionAgent` subclass | Trigger event received on subscribed stream | wiki renderers, downstream agents, dashboard |
+
+Payload fields: `projection_id` (agent name), `content` (materialised document string),
+`confidence` (aggregate_confidence() result, may be `null`), `event_count`, `streams`.
+
 ### Consumer-defined streams
 
 Loopkit places no constraints on consumer event types. Convention: `<stream>.<action>`.
@@ -40,14 +49,24 @@ Examples from current consumers:
 
 ### `governance.*` — Audit and policy decisions
 
-All governance events are published by `AuditAgent` to the `governance` stream.
-They are themselves persisted and inspectable — the auditor is auditable.
+All `governance.*` events are persisted and inspectable — the auditor is auditable.
+`AuditAgent` never subscribes to `governance.*` (prevents loops).
 
 | Event type | Published by | Condition | Typical subscribers |
 |---|---|---|---|
 | `governance.audit_flagged` | `AuditAgent` | generic policy rule breach | human-review agents, alerting |
 | `governance.depth_exceeded` | `AuditAgent` | `delegation_depth > max_delegation_depth` | kill-switch agents, alerting |
 | `governance.trust_escalation` | `AuditAgent` | `trust_level == UNTRUSTED` | policy router, alerting |
+| `governance.confidence_breach` | `AuditAgent` | `_meta.confidence < confidence_threshold` | quality gates, alerting |
+| `governance.dispute_opened` | ConflictResolutionExecutor (v3) | competing agent interpretations of same entity | mediator agents, human review |
+| `governance.dispute_resolved` | ConflictResolutionExecutor / human | dispute closed by consensus or override | downstream agents, audit log |
+| `governance.human_override` | human-facing components | HIGH-trust human supersedes agent synthesis | audit log, downstream agents |
+
+`governance.confidence_breach` payload includes `confidence` (float) and `threshold` (float)
+in addition to the standard `flagged_event_id`, `flagged_event_type`, `flagged_source`, `detail` fields.
+
+`governance.dispute_opened` and `governance.dispute_resolved` use `correlation_id` as the
+dispute identifier — a dispute is a workflow; all events in it share a `correlation_id`.
 
 ---
 

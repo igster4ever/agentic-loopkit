@@ -20,7 +20,9 @@ from .bus import EventBus
 from .events.models import Event, EventMeta, SystemEventType, TrustLevel, WILDCARD_STREAM
 from .events.router import EventRouter, Subscriber
 from .events.store import append_event, load_events
+from .events.confidence import aggregate_confidence
 from .agents.base import AgentBase
+from .agents.projection import ProjectionAgent, ProjectionEventType
 from .loops.ralf import RALFExecutor, RALFResult, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, CONFIDENCE_HIGH
 from .loops.react import ReActExecutor, ReActResult, ReActStep
 from .loops.plan import PlanExecutor, PlanResult, PlanStep
@@ -44,8 +46,11 @@ __all__ = [
     "Subscriber",
     "append_event",
     "load_events",
+    "aggregate_confidence",
     # Agents
     "AgentBase",
+    "ProjectionAgent",
+    "ProjectionEventType",
     # Executors — RALF
     "RALFExecutor",
     "RALFResult",

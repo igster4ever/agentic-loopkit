@@ -13,6 +13,10 @@ Published events (stream: 'governance'):
     governance.audit_flagged    — generic governance flag
     governance.depth_exceeded   — delegation_depth exceeded threshold
     governance.trust_escalation — source declared TrustLevel.UNTRUSTED
+    governance.confidence_breach — _meta.confidence below configured threshold
+    governance.dispute_opened   — competing agent interpretations of same entity
+    governance.dispute_resolved — dispute closed (consensus or human override)
+    governance.human_override   — HIGH-trust human decision supersedes agent synthesis
 
 Subscribed streams:
     * (all streams) — AuditAgent is a wildcard observer

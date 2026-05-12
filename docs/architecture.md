@@ -88,6 +88,14 @@ executor patterns layered on top.
 │                │ (confidence=1.0); gaps fed back to next act() iteration.  │
 │                │ Mirrors Anthropic Managed Agents grader contract.         │
 ├────────────────┼────────────────────────────────────────────────────────────┤
+│ Projection-    │ AgentBase subclass. Subscribes to trigger streams; on each │
+│ Agent          │ event loads the full event log for projection_streams and  │
+│                │ calls materialise() (LLM phase in orient()). Emits a      │
+│                │ projection.updated event with content + aggregate_         │
+│                │ confidence(). should_materialise() hook for trigger        │
+│                │ filtering. The wiki page is a projection; the event log   │
+│                │ is the source of truth.                                   │
+├────────────────┼────────────────────────────────────────────────────────────┤
 │ Event          │ Immutable record. stream auto-derived from event_type     │
 │                │ prefix. causation_id + correlation_id for traceability.   │
 │                │ trust_level (TrustLevel enum) + delegation_depth (int)    │
@@ -359,15 +367,117 @@ GET `/api/streams`, `/api/events`, `/api/events/{id}`, `/api/chains/{correlation
 EventChainGraph (dagre DAG), EventDetailPanel (payload + context tab),
 EventTimeline (Recharts scatter), ChainPage (`/chains/:id`). Spec in `docs/dashboard-architecture.md`.
 
+### Phase B governance — enforcement layer (planned, v3)
+
+Phase A governance (`AuditAgent`) is **observability**: watch all streams, flag threshold
+violations, emit structured events.  Phase B is **enforcement**: respond to governance events
+with policy actions.
+
+The two phases are intentionally separate components with a clean interface between them:
+
+```
+Phase A — AuditAgent                    Phase B — KillSwitchAgent
+─────────────────────────               ─────────────────────────────────────
+Subscribes to: all streams (*)          Subscribes to: governance.* only
+Emits:  governance.*                    Emits:  governance.halt, governance.quarantine,
+                                                governance.human_override
+Role:   observe and flag                Role:   enforce policy on flagged events
+```
+
+**Rule**: Phase A must be running before Phase B.  You cannot enforce what you cannot observe.
+
+#### KillSwitchAgent (planned)
+
+**Location:** `agentic_govkit/agents/killswitch.py`
+
+```python
+class KillSwitchAgent(AgentBase):
+    """
+    Policy enforcement agent.  Subscribes to governance.* and executes
+    configurable enforcement actions when governance thresholds are breached.
+
+    All enforcement decisions are themselves events — the enforcer is
+    observable and auditable, consistent with Phase A.
+
+    trust_level: HIGH — enforcement events carry the highest trust weight
+    so they propagate correctly through aggregate_confidence().
+    """
+
+    def __init__(
+        self,
+        name: str,
+        bus: EventBus,
+        policy: dict[GovernanceEventType, EnforcementAction],
+    ) -> None: ...
+```
+
+**Built-in enforcement actions:**
+
+| Action | Effect | Event emitted |
+|---|---|---|
+| `halt_correlation` | Prevents further processing in a correlation chain | `governance.halt` |
+| `quarantine_source` | Flags a source as quarantined; downstream agents check | `governance.quarantine` |
+| `emit_human_override` | Escalates to human review queue | `governance.human_override` |
+
+**Example policy:**
+
+```python
+from agentic_govkit import KillSwitchAgent, GovernanceEventType
+from agentic_govkit.agents.killswitch import halt_correlation, emit_human_override
+
+kill = KillSwitchAgent("killswitch", bus, policy={
+    GovernanceEventType.DEPTH_EXCEEDED:    halt_correlation,
+    GovernanceEventType.TRUST_ESCALATION:  emit_human_override,
+    GovernanceEventType.CONFIDENCE_BREACH: emit_human_override,
+})
+kill.subscribe("governance")
+bus.register(kill)
+```
+
+**Design principles:**
+- `KillSwitchAgent` subscribes to `governance.*`, not `*` — it reacts to decisions, not raw events
+- Never calls `AuditAgent` directly — receives its output as bus events (module boundary preserved)
+- Disabled by default — must be explicitly instantiated; purely opt-in
+- All enforcement actions emit events at `TrustLevel.HIGH`, making them traceable via the
+  same governance archaeology pattern as all other events
+
+#### ConflictResolutionExecutor (planned)
+
+Mediates between two competing agent orientations about the same entity.  Triggered by
+`governance.dispute_opened`; resolves to `governance.dispute_resolved` or escalates to
+`governance.human_override` on max iterations.
+
+Full spec in `docs/idioms-adoption-plan.md § ConflictResolutionExecutor`.
+
+#### New GovernanceEventType entries required for Phase B
+
+```python
+HALT        = "governance.halt"        # correlation chain halted by KillSwitchAgent
+QUARANTINE  = "governance.quarantine"  # source quarantined by KillSwitchAgent
+```
+
+These are not yet implemented — add to `agentic_govkit/events/models.py` when
+`KillSwitchAgent` is built.
+
+---
+
 ### Governance layer (see `docs/event-catalog.md`)
 
 `agentic_govkit/` — separate top-level package in same repo. Zero extra runtime deps.
 Install via `pip install agentic-loopkit[governance]`.
 
 - **`AuditAgent`** — subscribes to all streams (`WILDCARD_STREAM`); emits `governance.*` events when
-  `delegation_depth > max_delegation_depth` or `trust_level == UNTRUSTED`. All decisions are
-  themselves events on the bus — the auditor is fully observable.
-- **`GovernanceEventType`** — `governance.depth_exceeded`, `governance.trust_escalation`, `governance.audit_flagged`
+  thresholds are breached. Optional `confidence_threshold` parameter auto-flags events where
+  `_meta.confidence < threshold`. All decisions are themselves events on the bus — the auditor
+  is fully observable.
+- **`GovernanceEventType`** — full vocabulary:
+  - `governance.depth_exceeded` — `delegation_depth > max_delegation_depth`
+  - `governance.trust_escalation` — `trust_level == UNTRUSTED`
+  - `governance.audit_flagged` — generic policy flag (reserved for future rules)
+  - `governance.confidence_breach` — `_meta.confidence < confidence_threshold`
+  - `governance.dispute_opened` — competing agent interpretations of same entity
+  - `governance.dispute_resolved` — dispute closed (consensus or human override)
+  - `governance.human_override` — HIGH-trust human decision supersedes agent synthesis
 - **Module boundary contract**: `agentic_govkit → agentic_loopkit` (public API only); never reversed.
   Enforced by `tests/govkit/test_module_boundaries.py`.
 

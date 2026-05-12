@@ -19,6 +19,9 @@ The OODA+ReAct composition pattern is documented as the canonical wiring example
 | Outcome (rubric-governed evaluation) | **Build** | `loops/outcome.py` | 4 | ✅ Built 2026-05-07 |
 | Tree-of-Thoughts | **Defer** | — | Out of scope v1 | Deferred |
 | OODA+ReAct composition | **Document** | CLAUDE.md + architecture.md | — | ✅ Done 2026-05-02 |
+| ProjectionAgent (live view materialisation) | **Build** | `agents/projection.py` | v3-1 | ✅ Built 2026-05-12 |
+| Replay-as-archaeology | **Document** | `docs/idioms-adoption-plan.md` | v3-2 | ✅ Done 2026-05-12 |
+| ConflictResolutionExecutor | **Defer** | `loops/conflict.py` | v3-3 | Deferred — no consumer yet |
 
 ---
 
@@ -252,10 +255,309 @@ class OutcomeExecutor(RALFExecutor):
 
 ---
 
-## 5. Tree-of-Thoughts — deferred
+## 5. ProjectionAgent
+
+**Location:** `agentic_loopkit/agents/projection.py`
+
+Reactive agent that materialises a live document from the event log.  The event log is the
+source of truth; the materialised document is a *projection* — regenerated whenever a trigger
+event arrives on a subscribed stream.
+
+This distinction matters for governance: pages can evolve automatically, historical versions
+are reconstructable by replaying the log at any point in time, and conflicting interpretations
+can coexist as separate `ProjectionAgent` subclasses reading the same source events.
+
+### Abstract interface
+
+```python
+class ProjectionAgent(AgentBase):
+
+    def __init__(
+        self, name: str, bus: EventBus,
+        projection_streams: list[str] | None = None,
+    ) -> None: ...
+
+    @property
+    def projection_streams(self) -> list[str]:
+        """Streams to load when materialising. Defaults to subscription streams."""
+
+    def should_materialise(self, event: Event) -> bool:
+        """Gate: return False to skip this trigger event. Default: True."""
+
+    @abstractmethod
+    async def materialise(self, events: list[Event]) -> str:
+        """
+        PRIMARY LLM PHASE — called from orient().
+        Receives all events for projection_streams; returns the document as a string.
+        """
+```
+
+### OODA wiring
+
+```
+observe()   — calls should_materialise(); None if False                (deterministic)
+orient()    — loads events via load_all_events(); calls materialise()  (LLM here)
+             — calls aggregate_confidence() to compute page-level score
+decide()    — pass-through                                             (deterministic)
+act()       — publishes projection.updated with content + confidence   (deterministic)
+```
+
+### Emitted event
+
+```python
+Event(
+    event_type = "projection.updated",  # stream: "projection"
+    source     = agent.name,
+    payload = {
+        "projection_id": agent.name,
+        "content":       "<materialised document>",
+        "confidence":    0.82,           # aggregate_confidence() result; None if no _meta
+        "event_count":   42,
+        "streams":       ["gps", "adr"],
+        "_meta": { "phase": "orient", "loop_type": "ooda", "confidence": 0.82, ... }
+    }
+)
+```
+
+### Usage example
+
+```python
+class WikiPageAgent(ProjectionAgent):
+    def should_materialise(self, event):
+        return event.event_type in ("gps.cycle_complete", "adr.record_new")
+
+    async def materialise(self, events):
+        return await my_llm.call(
+            system="Synthesise these events into a wiki page.",
+            user="\n".join(e.payload.get("summary","") for e in events),
+        )
+
+agent = WikiPageAgent("wiki", bus, projection_streams=["gps", "adr"])
+agent.subscribe("gps", "adr")
+bus.register(agent)
+```
+
+### Design decisions
+
+- **LLM in `materialise()` only** — called from `orient()`; all other phases deterministic.
+- **`projection_streams` decoupled from subscriptions** — subscribe to trigger streams, load
+  from a broader or different set when materialising (e.g. subscribe to `"tickets"`, load
+  from `"tickets"` and `"comments"`).
+- **`aggregate_confidence()` wired in by default** — page-level confidence is computed from
+  `_meta.confidence` across source events, weighted by `TrustLevel` and `delegation_depth`.
+  Returns `None` when no source events carry confidence data.
+- **Projection is itself an event** — `projection.updated` is persisted to the bus, making
+  the projection queryable, replayable, and subscribable by downstream agents.
+
+---
+
+## 6. ConflictResolutionExecutor — deferred (v3)
+
+**Planned location:** `agentic_loopkit/loops/conflict.py`
+**Prerequisite:** gps-wiki `ProjectionAgent` integration must validate the dispute interface
+before this is built. Do not implement without a concrete consumer proving the design.
+
+### Problem
+
+Two agents produce incompatible orientations about the same entity — same `correlation_id`,
+contradictory conclusions.  Phase A governance (`AuditAgent`) observes and flags this via
+`governance.dispute_opened`.  Phase B needs a mechanism to resolve it.
+
+Characteristics of the problem that drive the design:
+- Neither position is obviously wrong — both may be valid from different evidence sets
+- A simple "last writer wins" produces silent data loss
+- Self-critique (`ReflexionExecutor`) anchors to one position; the mediator must see both
+  positions neutrally
+- Evaluation must be isolated from the act() context — the same isolation contract as
+  `OutcomeExecutor`, for the same reason (prevents anchoring bias)
+
+### Design
+
+`ConflictResolutionExecutor` extends `OutcomeExecutor`.  `OutcomeExecutor` is the right base
+because isolated evaluation is already its core contract.  The only new concept is that `act()`
+receives two competing positions rather than a single prior result.
+
+```python
+class ConflictResolutionExecutor(OutcomeExecutor):
+    """
+    Mediates between two competing agent positions on the same entity.
+
+    Loop: retrieve (load both positions) →
+          [act (synthesise) → evaluate (isolated rubric check)] × max_iterations →
+          follow_up (emit dispute_resolved or escalate to human_override)
+
+    Isolation contract (inherited from OutcomeExecutor):
+        evaluate(synthesis, rubric) receives ONLY the synthesis and rubric —
+        no prior reasoning history from either competing agent. This prevents
+        the mediator anchoring on whichever position it encountered first.
+    """
+    max_iterations: int = 3
+
+    @property
+    @abstractmethod
+    def rubric(self) -> str:
+        """
+        Markdown criteria for a valid reconciliation. Must be explicit and gradeable.
+        Example criterion: "The synthesis must not contradict either source position
+        without explaining why the contradiction was resolved."
+        """
+
+    @abstractmethod
+    async def retrieve(self, event: Event) -> dict:
+        """
+        Load both competing positions.  Return context dict with at minimum:
+            { "position_a": <Event or payload>, "position_b": <Event or payload> }
+        Source: load from the event store by correlation_id or from the event payload.
+        """
+
+    @abstractmethod
+    async def act(self, context: dict, prior_result: RALFResult) -> RALFResult:
+        """
+        Produce a reconciled synthesis from both positions.
+        Primary LLM call. Use prior_result.output (gap list from evaluate) if present.
+        """
+
+    # evaluate() — inherited from OutcomeExecutor.
+    # Signature: evaluate(synthesis, rubric) -> (satisfied, gaps)
+    # Must call LLM with ONLY (synthesis, rubric) — no agent history.
+
+    async def follow_up(self, event: Event, result: RALFResult) -> Optional[Event]:
+        """
+        On complete: emit governance.dispute_resolved with the reconciled view.
+        On max_iterations / error: emit governance.human_override to escalate.
+        """
+```
+
+### Event flow
+
+```
+governance.dispute_opened     ← emitted by something that detected the conflict
+        │
+        ▼
+ConflictResolutionExecutor.run(event)
+        │
+        ├─ retrieve()   — load position_a, position_b
+        ├─ act()        — LLM synthesises a reconciliation
+        ├─ evaluate()   — isolated rubric check (no history)
+        │
+        ├─ satisfied=True  ──▶  governance.dispute_resolved  (content = synthesis)
+        └─ max_iterations  ──▶  governance.human_override    (content = both positions + gap list)
+```
+
+### Key design decisions
+
+- **Extends `OutcomeExecutor`, not `ReflexionExecutor`** — self-critique (Reflexion) anchors to
+  one position; external rubric evaluation (Outcome) is the correct neutral model for mediation.
+- **`evaluate()` isolation is non-negotiable** — the mediator must not know which position "came
+  first." Both positions must be presented symmetrically in `act()` context.
+- **Human escalation on max_iterations** — unresolved disputes become `governance.human_override`
+  events, not silent failures.  The human sees both positions + the gap list from the last
+  `evaluate()` call.
+- **`correlation_id` is the dispute key** — all events in a dispute share a `correlation_id`.
+  `retrieve()` uses this to load both positions from the store.
+- **`ConflictResolutionExecutor` is not `AuditAgent`** — `AuditAgent` observes and flags;
+  `ConflictResolutionExecutor` mediates. They are separate concerns. The audit flag triggers
+  the executor; the executor does not flag.
+
+### Comparison with existing executors
+
+| | `ReflexionExecutor` | `OutcomeExecutor` | `ConflictResolutionExecutor` |
+|---|---|---|---|
+| Inputs | Single prior result | Single artifact | Two competing positions |
+| Evaluation context | Same as act() | Isolated | Isolated |
+| Evaluation type | Self-critique | Rubric grader | Rubric mediator |
+| Anchoring risk | Present | Eliminated | Eliminated by design |
+| On max_iterations | error | error | human_override event |
+
+---
+
+## 7. Tree-of-Thoughts — deferred
 
 High complexity, niche use case. Requires branching state management and a scoring/pruning
 function that doesn't map to the loopkit's linear bounded-loop model. Revisit post-v1.
+
+---
+
+## Replay-as-Archaeology Pattern
+
+> *"Historical versions are reconstructable. Replay becomes governance archaeology."*
+
+The JSONL event store already supports this — no new infrastructure needed.  `load_events()`
+with time-range and filter parameters reconstructs what the system knew at any point in time.
+
+### The key functions
+
+```python
+from agentic_loopkit import load_events
+from agentic_loopkit.events.store import load_all_events
+
+# Recent window (default 72h)
+events = load_events("gps")
+
+# Custom window
+events = load_events("gps", hours=6)
+
+# Full history — no time filter
+events = load_all_events("gps")
+
+# Across all streams (wildcard)
+events = load_all_events("*")
+
+# A complete workflow by correlation_id
+events = load_events("*", correlation_id="CU-123", hours=24 * 365)
+
+# A specific event by ID (short-circuits on first match — cheap even over wildcard)
+events = load_events("*", event_id="<uuid>")
+```
+
+### Archaeology queries
+
+| Question | Query |
+|---|---|
+| What events led up to this governance flag? | `load_events("*", correlation_id=flag.correlation_id)` |
+| What did the system know about stream X six hours ago? | `load_events("x", hours=6)` |
+| When did agent Y first emit a low-confidence result? | `load_all_events("*")` + filter `_meta.confidence < 0.65` |
+| What was the projection state before this dispute? | `load_events("projection", hours=48)` + filter by `projection_id` |
+| Replay a full correlation chain | `load_events("*", correlation_id=..., hours=24*365)` |
+
+### Relationship to ProjectionAgent
+
+A `ProjectionAgent` calls `load_all_events()` every time it materialises.  This means:
+
+- **Any past point in time is reconstructable**: run `ProjectionAgent.materialise()` against
+  the event slice that existed at time T — the result is the projection as it would have been
+  generated then.
+- **Conflicting projections can coexist**: two `ProjectionAgent` subclasses reading the same
+  events but with different `materialise()` implementations produce different views.  Both are
+  valid; the event log arbitrates disputes by providing the authoritative source for both.
+- **Human overrides are events too**: a `governance.human_override` event in the store means
+  any post-override replay naturally incorporates the human decision.
+
+### Governance archaeology example
+
+```python
+# When was delegation depth first exceeded for this workflow?
+all_events = load_events("*", correlation_id="CU-123", hours=24 * 365)
+depth_flags = [
+    e for e in all_events
+    if e.event_type == "governance.depth_exceeded"
+]
+first_flag = min(depth_flags, key=lambda e: e.timestamp)
+
+# What were the three events immediately before the flag?
+preceding = [
+    e for e in all_events
+    if e.timestamp < first_flag.timestamp
+][-3:]
+```
+
+### Rules
+
+- Use `load_events()` for windowed queries (recent activity, dashboards, live-tail).
+- Use `load_all_events()` for projections and governance archaeology (full history required).
+- Use `correlation_id` to scope queries to a workflow — it's the most powerful filter.
+- The store is append-only; `compact_stream()` prunes by retention window but never rewrites
+  content. Archaeology is always consistent with what was actually observed.
 
 ---
 
@@ -282,25 +584,37 @@ They are not alternatives — they are layers.
 
 ## Public API Additions
 
-Add to `agentic_loopkit/__init__.py` as each executor is implemented:
-
 ```python
-from .loops.react import ReActExecutor, ReActResult, ReActStep
-from .loops.plan import PlanExecutor, PlanResult, PlanStep
-from .loops.reflexion import ReflexionExecutor
-from .loops.outcome import OutcomeExecutor
+# v2 — executor family
+from .loops.react      import ReActExecutor, ReActResult, ReActStep
+from .loops.plan       import PlanExecutor, PlanResult, PlanStep
+from .loops.reflexion  import ReflexionExecutor
+from .loops.outcome    import OutcomeExecutor
+
+# v3 — deliberation-space primitives
+from .agents.projection import ProjectionAgent, ProjectionEventType
+from .events.confidence import aggregate_confidence
 ```
 
 ---
 
 ## Implementation Order
 
+### v2
 1. ✅ `loops/react.py` — ReActExecutor + tests (2026-05-04)
 2. ✅ `loops/plan.py` — PlanExecutor + tests (2026-05-04)
 3. ✅ `loops/reflexion.py` — ReflexionExecutor + tests; `_post_act_hook()` extension point added to RALFExecutor (2026-05-05)
 4. ✅ `loops/outcome.py` — OutcomeExecutor + tests; rubric-governed isolated evaluation (2026-05-07)
 5. ✅ Update `CLAUDE.md` and `docs/architecture.md` with composition pattern (2026-05-02, updated 2026-05-07)
 6. ✅ Update `__init__.py` exports after each (ongoing)
+
+### v3 — deliberation-space primitives
+7. ✅ `events/confidence.py` — `aggregate_confidence()` utility + tests (2026-05-12)
+8. ✅ `agentic_govkit/events/models.py` — GovernanceEventType extended: CONFIDENCE_BREACH, DISPUTE_OPENED, DISPUTE_RESOLVED, HUMAN_OVERRIDE (2026-05-12)
+9. ✅ `agentic_govkit/agents/audit.py` — `confidence_threshold` parameter; auto-flags CONFIDENCE_BREACH (2026-05-12)
+10. ✅ `agents/projection.py` — ProjectionAgent + ProjectionEventType + tests (2026-05-12)
+11. ✅ Replay-as-archaeology pattern documented (this file, 2026-05-12)
+12. ⏳ `loops/conflict.py` — ConflictResolutionExecutor (deferred; build once gps-wiki integration validates the interface)
 
 ---
 

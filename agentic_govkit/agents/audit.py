@@ -42,9 +42,16 @@ class AuditAgent(AgentBase):
                               this value.  Default: 5.
     """
 
-    def __init__(self, name: str, bus: Any, max_delegation_depth: int = 5) -> None:
+    def __init__(
+        self,
+        name: str,
+        bus: Any,
+        max_delegation_depth: int = 5,
+        confidence_threshold: float | None = None,
+    ) -> None:
         super().__init__(name, bus)
-        self.max_delegation_depth = max_delegation_depth
+        self.max_delegation_depth  = max_delegation_depth
+        self.confidence_threshold  = confidence_threshold
         self.subscribe(WILDCARD_STREAM)
 
     # ── OODA pipeline ─────────────────────────────────────────────────────────
@@ -73,6 +80,23 @@ class AuditAgent(AgentBase):
                 "detail": f"source='{e.source}' declared trust_level=untrusted",
             })
 
+        if self.confidence_threshold is not None:
+            meta = e.meta()
+            if meta is not None:
+                confidence = meta.get("confidence")
+                if confidence is not None and confidence < self.confidence_threshold:
+                    flags.append({
+                        "governance_type": GovernanceEventType.CONFIDENCE_BREACH,
+                        "detail": (
+                            f"confidence={confidence:.3f} "
+                            f"below threshold={self.confidence_threshold:.3f}"
+                        ),
+                        "extra": {
+                            "confidence":  confidence,
+                            "threshold":   self.confidence_threshold,
+                        },
+                    })
+
         return {"flags": flags} if flags else None
 
     async def decide(self, event: Event, orientation: dict[str, Any]) -> dict[str, Any] | None:
@@ -81,7 +105,8 @@ class AuditAgent(AgentBase):
     async def act(self, event: Event, action: dict[str, Any]) -> None:
         for flag in action["flags"]:
             governance_type = str(flag["governance_type"])
-            detail = flag["detail"]
+            detail          = flag["detail"]
+            extra           = flag.get("extra", {})
             await self._bus.publish(
                 event.caused(
                     governance_type,
@@ -91,6 +116,7 @@ class AuditAgent(AgentBase):
                         "flagged_event_type": str(event.event_type),
                         "flagged_source":     event.source,
                         "detail":             detail,
+                        **extra,
                         "_meta": EventMeta(
                             phase="act",
                             loop_type="ooda",

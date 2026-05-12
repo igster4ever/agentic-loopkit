@@ -18,10 +18,12 @@ agentic_loopkit/
 ├── events/
 │   ├── models.py            # Event + EventMeta dataclasses + SystemEventType(StrEnum)
 │   ├── router.py            # Async callback fanout (Subscriber = Callable[[Event], Awaitable[None]])
-│   └── store.py             # JSONL per-stream persistence (~/.cache/<app>/events-<stream>.jsonl)
+│   ├── store.py             # JSONL per-stream persistence (~/.cache/<app>/events-<stream>.jsonl)
+│   └── confidence.py        # aggregate_confidence() — TrustLevel-weighted, depth-decayed mean
 │
 ├── agents/
-│   └── base.py              # AgentBase — OODA loop (observe → orient → decide → act)
+│   ├── base.py              # AgentBase — OODA loop (observe → orient → decide → act)
+│   └── projection.py        # ProjectionAgent + ProjectionEventType — live view materialisation from event log
 │
 ├── loops/
 │   ├── ralf.py              # RALFExecutor — bounded task loop (retrieve → act → learn → follow-up)
@@ -236,6 +238,23 @@ Polls a local git repository via subprocess `git log`. Zero extra deps — pure 
 Cursor = last seen commit SHA; first run fetches commits since `initial_since_hours` (default 24h).
 Emits `git.commit_added`. Use for any locally-cloned repo you pull regularly.
 
+### ProjectionAgent (live view materialisation)
+Reactive `AgentBase` subclass. Subscribes to trigger streams; on each event loads the full
+event log for `projection_streams` and calls `materialise(events)` (the LLM phase, in `orient()`).
+- `materialise(events)` → `str` (abstract; primary LLM call)
+- `should_materialise(event)` → `bool` (hook; default True; override to filter triggers)
+- `projection_streams` property — defaults to subscription streams; set explicitly to decouple
+  load scope from trigger scope
+- Emits `projection.updated` (stream: `projection`) with content, confidence, event_count, streams
+- `aggregate_confidence()` wired in by default — page-level confidence from `_meta.confidence`
+  across source events, weighted by TrustLevel and decayed by delegation_depth
+
+### aggregate_confidence()
+Utility in `agentic_loopkit/events/confidence.py`. Weighted mean of `_meta.confidence` across
+a list of Events. Weight = TrustLevel ordinal (HIGH=3, MEDIUM=2, LOW=1, UNTRUSTED=0) ×
+depth decay (1 / (1 + delegation_depth)). Returns `None` when no events carry confidence data
+or all sources are UNTRUSTED.
+
 ## Public API
 
 ```python
@@ -248,6 +267,9 @@ from agentic_loopkit import (
     append_event, load_events,
     # Agents
     AgentBase,
+    ProjectionAgent, ProjectionEventType,
+    # Confidence
+    aggregate_confidence,
     # Executors — RALF
     RALFExecutor, RALFResult,
     CONFIDENCE_LOW, CONFIDENCE_MEDIUM, CONFIDENCE_HIGH,
@@ -423,7 +445,7 @@ Note: governance events land on `events-governance.jsonl` alongside all other st
 # Note: system Python is blocked by PEP 668 on macOS — always use .venv/bin/python
 ```
 
-262 tests, all passing (as of 2026-05-11). Coverage: EventBus, EventRouter, EventStore,
+302 tests, all passing (as of 2026-05-12). Coverage: EventBus, EventRouter, EventStore,
 AgentBase (all OODA short-circuit paths), RALFExecutor (confidence rejection, learn, follow-up,
 _post_act_hook extension), ReActExecutor (happy path, max_steps, error handling, on_step hook,
 follow-up), PlanExecutor (all-complete, partial, failed, plan() raises, step exception recovery,
@@ -492,7 +514,7 @@ Emits structured governance events when thresholds are breached — the auditor 
 from agentic_govkit import AuditAgent, GovernanceEventType
 from agentic_loopkit import EventBus, WILDCARD_STREAM
 
-audit = AuditAgent("audit", bus, max_delegation_depth=5)
+audit = AuditAgent("audit", bus, max_delegation_depth=5, confidence_threshold=0.4)
 # subscribes to WILDCARD_STREAM automatically
 bus.register(audit)
 ```
@@ -501,6 +523,10 @@ Flags raised as events on the `governance` stream:
 - `governance.depth_exceeded` — `delegation_depth > max_delegation_depth`
 - `governance.trust_escalation` — `trust_level == TrustLevel.UNTRUSTED`
 - `governance.audit_flagged` — generic policy flag (reserved for future rules)
+- `governance.confidence_breach` — `_meta.confidence < confidence_threshold` (opt-in; disabled if threshold=None)
+- `governance.dispute_opened` — emitted by ConflictResolutionExecutor (v3; not yet built)
+- `governance.dispute_resolved` — emitted by ConflictResolutionExecutor on consensus or human override
+- `governance.human_override` — HIGH-trust human decision supersedes agent synthesis
 
 ### TrustLevel
 
