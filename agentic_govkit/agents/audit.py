@@ -21,8 +21,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agentic_loopkit import AgentBase, Event, TrustLevel, WILDCARD_STREAM
-from agentic_loopkit.events.models import EventMeta
+from agentic_loopkit import AgentBase, Event, EventMeta, TrustLevel, WILDCARD_STREAM
 from agentic_govkit.events.models import GovernanceEventType
 
 

@@ -14,6 +14,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from ..constants import DEFAULT_HOURS
 from ..dependencies import get_bus
 from ...bus import EventBus
 from ...events.models import WILDCARD_STREAM, Event
@@ -22,7 +23,7 @@ from ...events.store import load_events
 log = logging.getLogger("agentic_loopkit.dashboard.routes.chains")
 router = APIRouter()
 
-_DEFAULT_HOURS = 72
+_DEFAULT_HOURS = DEFAULT_HOURS
 
 
 @router.get("/chains/{correlation_id}")

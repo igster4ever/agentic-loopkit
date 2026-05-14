@@ -26,10 +26,16 @@ def _grep(pattern: str, directory: Path) -> str:
 
 
 def test_govkit_does_not_import_loopkit_private_internals():
-    """govkit must only import from agentic_loopkit's public __init__ surface."""
-    hits = _grep(r"from agentic_loopkit\._", GOVKIT_DIR)
+    """govkit must only import from agentic_loopkit's public __init__ surface.
+
+    Catches any sub-package import (e.g. from agentic_loopkit.events.models import X)
+    not just underscore-prefixed paths.  All govkit imports must come via the top-level
+    agentic_loopkit __init__ (e.g. from agentic_loopkit import X).
+    """
+    hits = _grep(r"from agentic_loopkit\.", GOVKIT_DIR)
     assert hits == "", (
-        "agentic_govkit imports private loopkit internals — use the public API only:\n"
+        "agentic_govkit imports from a loopkit sub-module — use the public API only "
+        "(from agentic_loopkit import X):\n"
         + hits
     )
 

@@ -60,6 +60,7 @@ dashboard/
 agentic_loopkit/dashboard/           # Optional FastAPI management API (pip install agentic-loopkit[dashboard])
 ├── __init__.py              # exports create_app(bus) → FastAPI
 ├── app.py                   # app factory + static file mount
+├── constants.py             # shared route constants (DEFAULT_HOURS, DEFAULT_LIMIT, MAX_LIMIT)
 ├── dependencies.py          # get_bus() FastAPI dependency
 ├── ws.py                    # WS /ws/tail live-tail endpoint
 └── routes/
@@ -552,7 +553,7 @@ is added to this repo.
 
 **Rules:**
 1. Each top-level package (`agentic_loopkit`, `agentic_govkit`) is a module with a declared public surface in its `__init__.py`
-2. Cross-module imports are allowed only from the target module's `__init__.py` — never from private submodules (`from agentic_loopkit._internal import X` is forbidden)
+2. Cross-module imports are allowed only from the target module's `__init__.py` — never from sub-modules (`from agentic_loopkit.events.models import X` is forbidden; use `from agentic_loopkit import X`)
 3. Inter-module communication is via published `Event` objects on the shared bus — never direct method calls across module boundaries
 4. Dependencies are one-way: govkit → loopkit; loopkit has zero govkit imports
 5. Module tests are isolated — govkit fixtures initialise only govkit components + a minimal EventBus

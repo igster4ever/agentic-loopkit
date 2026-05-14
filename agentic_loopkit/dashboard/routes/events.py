@@ -12,17 +12,18 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from ..constants import DEFAULT_HOURS, DEFAULT_LIMIT, MAX_LIMIT
 from ..dependencies import get_bus
 from ...bus import EventBus
-from ...events.models import WILDCARD_STREAM
+from ...events.models import WILDCARD_STREAM, _iso
 from ...events.store import load_events
 
 log = logging.getLogger("agentic_loopkit.dashboard.routes.events")
 router = APIRouter()
 
-_DEFAULT_LIMIT = 100
-_MAX_LIMIT     = 1000
-_DEFAULT_HOURS = 72
+_DEFAULT_LIMIT = DEFAULT_LIMIT
+_MAX_LIMIT     = MAX_LIMIT
+_DEFAULT_HOURS = DEFAULT_HOURS
 
 
 @router.get("/events")
@@ -120,11 +121,3 @@ async def get_event(
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-
-
-def _iso(dt) -> str:
-    from datetime import timezone
-    if hasattr(dt, "tzinfo") and dt.tzinfo is None:
-        from datetime import datetime as _dt
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
