@@ -137,10 +137,10 @@ async def test_poll_deduplicates_same_task_across_lists(tmp_path):
     adapter = make_adapter(bus, list_ids=["list-1", "list-2"])
     duplicate_task = make_task(task_id="same-id")
 
-    async def fake_fetch_list(list_id, since_ms):
+    async def fake_paginate(url, since_ms, label):
         return [duplicate_task]
 
-    adapter._fetch_list = fake_fetch_list
+    adapter._paginate = fake_paginate
     events, _ = await adapter.poll(cursor=0)
     assert len(events) == 1
 

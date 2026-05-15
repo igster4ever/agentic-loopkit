@@ -21,7 +21,7 @@ The OODA+ReAct composition pattern is documented as the canonical wiring example
 | OODA+ReAct composition | **Document** | CLAUDE.md + architecture.md | — | ✅ Done 2026-05-02 |
 | ProjectionAgent (live view materialisation) | **Build** | `agents/projection.py` | v3-1 | ✅ Built 2026-05-12 |
 | Replay-as-archaeology | **Document** | `docs/idioms-adoption-plan.md` | v3-2 | ✅ Done 2026-05-12 |
-| ConflictResolutionExecutor | **Defer** | `loops/conflict.py` | v3-3 | Deferred — no consumer yet |
+| ConflictResolutionExecutor | **Build** | `agentic_govkit/loops/conflict.py` | v3-3 | ✅ Built 2026-05-15 |
 
 ---
 
@@ -351,11 +351,14 @@ bus.register(agent)
 
 ---
 
-## 6. ConflictResolutionExecutor — deferred (v3)
+## 6. ConflictResolutionExecutor
 
-**Planned location:** `agentic_loopkit/loops/conflict.py`
-**Prerequisite:** gps-wiki `ProjectionAgent` integration must validate the dispute interface
-before this is built. Do not implement without a concrete consumer proving the design.
+**Location:** `agentic_govkit/loops/conflict.py`
+**Status:** ✅ Built 2026-05-15. Extends `OutcomeExecutor`. Exported from `agentic_govkit`.
+
+Note on location: placed in `agentic_govkit` (not `agentic_loopkit`) because it emits
+`governance.*` events — keeping it in loopkit would require either a boundary violation
+or string literals for GovernanceEventType values.
 
 ### Problem
 
@@ -614,7 +617,9 @@ from .events.confidence import aggregate_confidence
 9. ✅ `agentic_govkit/agents/audit.py` — `confidence_threshold` parameter; auto-flags CONFIDENCE_BREACH (2026-05-12)
 10. ✅ `agents/projection.py` — ProjectionAgent + ProjectionEventType + tests (2026-05-12)
 11. ✅ Replay-as-archaeology pattern documented (this file, 2026-05-12)
-12. ⏳ `loops/conflict.py` — ConflictResolutionExecutor (deferred; build once gps-wiki integration validates the interface)
+12. ✅ `agentic_govkit/loops/conflict.py` — ConflictResolutionExecutor (2026-05-15); extends OutcomeExecutor; emits governance.dispute_resolved / governance.human_override
+13. ✅ `agentic_govkit/agents/killswitch.py` — KillSwitchAgent + halt_correlation / quarantine_source / emit_human_override (2026-05-15)
+14. ✅ `agentic_govkit/events/models.py` — GovernanceEventType.HALT + QUARANTINE (2026-05-15)
 
 ---
 

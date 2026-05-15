@@ -367,7 +367,7 @@ GET `/api/streams`, `/api/events`, `/api/events/{id}`, `/api/chains/{correlation
 EventChainGraph (dagre DAG), EventDetailPanel (payload + context tab),
 EventTimeline (Recharts scatter), ChainPage (`/chains/:id`). Spec in `docs/dashboard-architecture.md`.
 
-### Phase B governance — enforcement layer (planned, v3)
+### Phase B governance — enforcement layer (✅ Built 2026-05-15)
 
 Phase A governance (`AuditAgent`) is **observability**: watch all streams, flag threshold
 violations, emit structured events.  Phase B is **enforcement**: respond to governance events
@@ -386,7 +386,7 @@ Role:   observe and flag                Role:   enforce policy on flagged events
 
 **Rule**: Phase A must be running before Phase B.  You cannot enforce what you cannot observe.
 
-#### KillSwitchAgent (planned)
+#### KillSwitchAgent (✅ Built 2026-05-15)
 
 **Location:** `agentic_govkit/agents/killswitch.py`
 
@@ -441,23 +441,20 @@ bus.register(kill)
 - All enforcement actions emit events at `TrustLevel.HIGH`, making them traceable via the
   same governance archaeology pattern as all other events
 
-#### ConflictResolutionExecutor (planned)
+#### ConflictResolutionExecutor (✅ Built 2026-05-15)
 
 Mediates between two competing agent orientations about the same entity.  Triggered by
 `governance.dispute_opened`; resolves to `governance.dispute_resolved` or escalates to
-`governance.human_override` on max iterations.
+`governance.human_override` on max iterations.  Located at `agentic_govkit/loops/conflict.py`.
 
 Full spec in `docs/idioms-adoption-plan.md § ConflictResolutionExecutor`.
 
-#### New GovernanceEventType entries required for Phase B
+#### GovernanceEventType entries for Phase B (✅ Built 2026-05-15)
 
 ```python
 HALT        = "governance.halt"        # correlation chain halted by KillSwitchAgent
 QUARANTINE  = "governance.quarantine"  # source quarantined by KillSwitchAgent
 ```
-
-These are not yet implemented — add to `agentic_govkit/events/models.py` when
-`KillSwitchAgent` is built.
 
 ---
 

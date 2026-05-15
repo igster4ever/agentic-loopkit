@@ -128,16 +128,17 @@ class ClickUpAdapter(PollingAdapter):
         """
         Fetch all tasks updated since since_ms across all configured lists.
 
-        Handles ClickUp pagination (page 0, 1, 2 … until last_page=True).
-        Returns a flat list of raw task dicts.
+        Returns a deduplicated flat list of raw task dicts.
         """
         tasks: list[dict] = []
 
         if self._list_ids:
             for list_id in self._list_ids:
-                tasks.extend(await self._fetch_list(list_id, since_ms))
+                url = f"https://api.clickup.com/api/v2/list/{list_id}/task"
+                tasks.extend(await self._paginate(url, since_ms, f"list {list_id}"))
         elif self._team_id:
-            tasks.extend(await self._fetch_team(self._team_id, since_ms))
+            url = f"https://api.clickup.com/api/v2/team/{self._team_id}/task"
+            tasks.extend(await self._paginate(url, since_ms, f"team {self._team_id}"))
 
         # Deduplicate by task id (a task in multiple lists appears once per list)
         seen: set[str] = set()
@@ -149,18 +150,15 @@ class ClickUpAdapter(PollingAdapter):
                 unique.append(t)
         return unique
 
-    async def _fetch_list(self, list_id: str, since_ms: int) -> list[dict]:
+    async def _paginate(self, url: str, since_ms: int, label: str) -> list[dict]:
         """
-        Paginate through GET /list/{list_id}/task?date_updated_gt={since_ms}.
+        Paginate through a ClickUp task list endpoint until last_page=True.
 
-        ClickUp API reference:
-            https://clickup.com/api/clickupreference/operation/GetTasks/
-
-        TODO: replace the stub below with a real aiohttp / httpx call.
+        Used for both /list/{id}/task and /team/{id}/task — the pagination
+        contract is identical across both endpoints.
         """
         import aiohttp  # noqa: PLC0415 — optional dep; only imported at call time
 
-        url     = f"https://api.clickup.com/api/v2/list/{list_id}/task"
         headers = {"Authorization": self._api_token}
         tasks: list[dict] = []
         page  = 0
@@ -176,51 +174,7 @@ class ClickUpAdapter(PollingAdapter):
                 }
                 async with session.get(url, headers=headers, params=params) as resp:
                     if resp.status == 429:
-                        log.warning("[clickup] rate limited on list %s — stopping pagination", list_id)
-                        break
-                    resp.raise_for_status()
-                    data = await resp.json()
-
-                batch = data.get("tasks", [])
-                tasks.extend(batch)
-
-                if data.get("last_page", True) or not batch:
-                    break
-                page += 1
-
-        return tasks
-
-    async def _fetch_team(self, team_id: str, since_ms: int) -> list[dict]:
-        """
-        Paginate through GET /team/{team_id}/task?date_updated_gt={since_ms}.
-
-        ClickUp API reference:
-            https://clickup.com/api/clickupreference/operation/GetFilteredTeamTasks/
-
-        Workspace-wide polls are slower and more likely to hit rate limits.
-        Prefer list_ids where possible.
-
-        TODO: replace the stub below with a real aiohttp / httpx call.
-        """
-        import aiohttp  # noqa: PLC0415
-
-        url     = f"https://api.clickup.com/api/v2/team/{team_id}/task"
-        headers = {"Authorization": self._api_token}
-        tasks: list[dict] = []
-        page  = 0
-
-        async with aiohttp.ClientSession() as session:
-            while True:
-                params = {
-                    "date_updated_gt": str(since_ms),
-                    "order_by":        "updated",
-                    "page":            str(page),
-                    "page_size":       str(self._page_size),
-                    "include_closed":  "true",
-                }
-                async with session.get(url, headers=headers, params=params) as resp:
-                    if resp.status == 429:
-                        log.warning("[clickup] rate limited on team %s — stopping pagination", team_id)
+                        log.warning("[clickup] rate limited on %s — stopping pagination", label)
                         break
                     resp.raise_for_status()
                     data = await resp.json()

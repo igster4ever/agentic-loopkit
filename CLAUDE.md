@@ -71,9 +71,12 @@ agentic_loopkit/dashboard/           # Optional FastAPI management API (pip inst
     └── adapters.py          # GET /api/adapters
 
 agentic_govkit/                  # Governance layer (pip install agentic-loopkit[governance])
-├── __init__.py              # exports AuditAgent, GovernanceEventType
+├── __init__.py              # exports AuditAgent, KillSwitchAgent, GovernanceEventType, ConflictResolutionExecutor
 ├── agents/
-│   └── audit.py             # AuditAgent — OODA wildcard observer; emits governance.* events
+│   ├── audit.py             # AuditAgent — OODA wildcard observer; emits governance.* events
+│   └── killswitch.py        # KillSwitchAgent — policy enforcement; emits halt/quarantine/human_override
+├── loops/
+│   └── conflict.py          # ConflictResolutionExecutor — OutcomeExecutor subclass; dispute mediation
 └── events/
     └── models.py            # GovernanceEventType StrEnum (governance.* stream)
 
@@ -90,7 +93,7 @@ tests/
 ├── loops/                   # test_ralf, test_react, test_plan, test_reflexion, test_outcome
 ├── adapters/                # test_base (PollingAdapter), test_clickup, test_slack, test_git
 ├── dashboard/               # test_routes_streams, test_routes_events, test_routes_chains, test_routes_agents_adapters
-└── govkit/                  # test_module_boundaries, test_audit_agent
+└── govkit/                  # test_module_boundaries, test_audit_agent, test_killswitch, test_conflict_resolution
 ```
 
 ## Core concepts
@@ -446,7 +449,7 @@ Note: governance events land on `events-governance.jsonl` alongside all other st
 # Note: system Python is blocked by PEP 668 on macOS — always use .venv/bin/python
 ```
 
-302 tests, all passing (as of 2026-05-12). Coverage: EventBus, EventRouter, EventStore,
+329 tests, all passing (as of 2026-05-15). Coverage: EventBus, EventRouter, EventStore,
 AgentBase (all OODA short-circuit paths), RALFExecutor (confidence rejection, learn, follow-up,
 _post_act_hook extension), ReActExecutor (happy path, max_steps, error handling, on_step hook,
 follow-up), PlanExecutor (all-complete, partial, failed, plan() raises, step exception recovery,
@@ -465,6 +468,10 @@ summary, agents, adapters), dashboard chain builder (edge derivation, summary.st
 dashboard WS /ws/tail (connect/disconnect, stream filter, router lifecycle, queue-full drop),
 AuditAgent (OODA pipeline, depth exceeded, trust escalation, combined flags, governance event
 payload, EventMeta in governance events, self-exclusion of governance stream),
+KillSwitchAgent (halt/quarantine/human_override enforcement, TrustLevel.HIGH on all outputs,
+policy miss ignored, self-exclusion prevents feedback loop, causation chain preserved),
+ConflictResolutionExecutor (dispute_resolved on complete, human_override on exhaustion/error,
+evaluate isolation contract, correlation_id threading, causation chain),
 module boundaries (govkit→loopkit one-way, loopkit→govkit zero, governance stream namespace).
 
 ## Dashboard
@@ -525,9 +532,37 @@ Flags raised as events on the `governance` stream:
 - `governance.trust_escalation` — `trust_level == TrustLevel.UNTRUSTED`
 - `governance.audit_flagged` — generic policy flag (reserved for future rules)
 - `governance.confidence_breach` — `_meta.confidence < confidence_threshold` (opt-in; disabled if threshold=None)
-- `governance.dispute_opened` — emitted by ConflictResolutionExecutor (v3; not yet built)
-- `governance.dispute_resolved` — emitted by ConflictResolutionExecutor on consensus or human override
-- `governance.human_override` — HIGH-trust human decision supersedes agent synthesis
+- `governance.dispute_opened` — emitted by ConflictResolutionExecutor when mediation begins
+- `governance.dispute_resolved` — emitted by ConflictResolutionExecutor on consensus (status=complete)
+- `governance.human_override` — emitted by ConflictResolutionExecutor (exhaustion/error) or KillSwitchAgent
+- `governance.halt` — emitted by KillSwitchAgent; correlation chain halted by policy
+- `governance.quarantine` — emitted by KillSwitchAgent; source quarantined by policy
+
+### KillSwitchAgent
+
+Policy enforcement agent. Subscribes to `governance.*`; maps event types to `EnforcementAction` callables.
+Built-in actions: `halt_correlation`, `quarantine_source`, `emit_human_override` (all set `TrustLevel.HIGH`).
+Self-excludes events it emits (`event.source == self.name`) to prevent feedback loops.
+
+```python
+from agentic_govkit import KillSwitchAgent, GovernanceEventType
+from agentic_govkit.agents.killswitch import halt_correlation, quarantine_source
+
+ks = KillSwitchAgent("killswitch", bus, policy={
+    GovernanceEventType.DEPTH_EXCEEDED:   halt_correlation,
+    GovernanceEventType.TRUST_ESCALATION: quarantine_source,
+})
+ks.subscribe("governance")
+bus.register(ks)
+```
+
+### ConflictResolutionExecutor
+
+`OutcomeExecutor` subclass in `agentic_govkit/loops/conflict.py`. Mediates between competing agent
+positions. Emits `governance.dispute_resolved` on consensus (`status="complete"`) or
+`governance.human_override` on exhaustion/error. Inherits `max_iterations=3` default.
+The `confidence=0.5` path in `OutcomeExecutor._post_act_hook` means `status="rejected"` is
+structurally unreachable — exhaustion exits as `status="error"`, triggering `human_override`.
 
 ### TrustLevel
 

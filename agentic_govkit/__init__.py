@@ -22,14 +22,19 @@ Subscribed streams:
     * (all streams) — AuditAgent is a wildcard observer
 
 Public API:
-    AuditAgent          — registers on bus, monitors all streams, emits governance events
-    GovernanceEventType — StrEnum of governance event types
+    AuditAgent                   — registers on bus, monitors all streams, emits governance events
+    GovernanceEventType          — StrEnum of governance event types
+    ConflictResolutionExecutor   — mediates competing agent positions; emits dispute_resolved or human_override
 """
 
 from agentic_govkit.agents.audit import AuditAgent
+from agentic_govkit.agents.killswitch import KillSwitchAgent
 from agentic_govkit.events.models import GovernanceEventType
+from agentic_govkit.loops.conflict import ConflictResolutionExecutor
 
 __all__ = [
     "AuditAgent",
+    "KillSwitchAgent",
     "GovernanceEventType",
+    "ConflictResolutionExecutor",
 ]

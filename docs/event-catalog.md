@@ -58,9 +58,11 @@ All `governance.*` events are persisted and inspectable — the auditor is audit
 | `governance.depth_exceeded` | `AuditAgent` | `delegation_depth > max_delegation_depth` | kill-switch agents, alerting |
 | `governance.trust_escalation` | `AuditAgent` | `trust_level == UNTRUSTED` | policy router, alerting |
 | `governance.confidence_breach` | `AuditAgent` | `_meta.confidence < confidence_threshold` | quality gates, alerting |
-| `governance.dispute_opened` | ConflictResolutionExecutor (v3) | competing agent interpretations of same entity | mediator agents, human review |
-| `governance.dispute_resolved` | ConflictResolutionExecutor / human | dispute closed by consensus or override | downstream agents, audit log |
-| `governance.human_override` | human-facing components | HIGH-trust human supersedes agent synthesis | audit log, downstream agents |
+| `governance.dispute_opened` | `ConflictResolutionExecutor` trigger | competing agent interpretations of same entity | `ConflictResolutionExecutor`, human review |
+| `governance.dispute_resolved` | `ConflictResolutionExecutor` | dispute closed by consensus | downstream agents, audit log |
+| `governance.human_override` | `ConflictResolutionExecutor` / `KillSwitchAgent` | consensus not reached or escalation policy | audit log, downstream agents |
+| `governance.halt` | `KillSwitchAgent` | correlation chain halted by policy | downstream agents, audit log |
+| `governance.quarantine` | `KillSwitchAgent` | source quarantined by policy | policy router, alerting |
 
 `governance.confidence_breach` payload includes `confidence` (float) and `threshold` (float)
 in addition to the standard `flagged_event_id`, `flagged_event_type`, `flagged_source`, `detail` fields.
@@ -73,10 +75,14 @@ dispute identifier — a dispute is a workflow; all events in it share a `correl
 ## Module communication contract
 
 ```
-agentic_loopkit  ──publishes──▶  EventBus  ──routes──▶  agentic_govkit (AuditAgent)
-                                                              │
-                                                 publishes governance.* back to bus
-                                                              │
+agentic_loopkit  ──publishes──▶  EventBus  ──routes──▶  agentic_govkit {
+                                                             AuditAgent       ── observes all (*) ──▶ publishes governance.*
+                                                             KillSwitchAgent  ── listens governance.* ──▶ publishes governance.halt/quarantine/human_override
+                                                             ConflictResolutionExecutor ── triggered by governance.dispute_opened ──▶ publishes governance.dispute_resolved/human_override
+                                                         }
+                                                             │
+                                              governance.* events routed to all bus subscribers
+                                                             │
                                               any subscriber (dashboards, alerts, agents)
 ```
 
@@ -85,6 +91,7 @@ agentic_loopkit  ──publishes──▶  EventBus  ──routes──▶  agen
 - `agentic_loopkit` has zero imports from `agentic_govkit`
 - All inter-module communication is via published `Event` objects on the shared bus
 - `AuditAgent` never subscribes to `governance.*` — prevents audit loops
+- `KillSwitchAgent` never subscribes to `*` — reacts to decisions (governance.*), not raw events
 
 ---
 
