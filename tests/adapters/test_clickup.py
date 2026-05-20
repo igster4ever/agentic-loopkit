@@ -132,17 +132,76 @@ def test_task_to_event_priority_none_when_not_dict(tmp_path):
 
 # ── Deduplication ─────────────────────────────────────────────────────────────
 
-async def test_poll_deduplicates_same_task_across_lists(tmp_path):
+async def test_fetch_all_deduplicates_same_task_across_lists(tmp_path):
+    import sys, types
+
     bus = EventBus(store_dir=tmp_path)
     adapter = make_adapter(bus, list_ids=["list-1", "list-2"])
     duplicate_task = make_task(task_id="same-id")
 
-    async def fake_paginate(url, since_ms, label):
+    # Each list returns the same task — _fetch_all must deduplicate
+    async def fake_paginate(session, url, since_ms, label):
         return [duplicate_task]
 
     adapter._paginate = fake_paginate
-    events, _ = await adapter.poll(cursor=0)
-    assert len(events) == 1
+
+    mock_session = MagicMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+    mock_aiohttp = types.ModuleType("aiohttp")
+    mock_aiohttp.ClientSession = MagicMock(return_value=mock_session)
+
+    original = sys.modules.get("aiohttp")
+    sys.modules["aiohttp"] = mock_aiohttp
+    try:
+        tasks = await adapter._fetch_all(since_ms=0)
+    finally:
+        if original is None:
+            del sys.modules["aiohttp"]
+        else:
+            sys.modules["aiohttp"] = original
+
+    assert len(tasks) == 1
+    assert tasks[0]["id"] == "same-id"
+
+
+async def test_fetch_all_shares_single_session_across_lists(tmp_path):
+    import sys
+    import types
+
+    bus = EventBus(store_dir=tmp_path)
+    adapter = make_adapter(bus, list_ids=["list-1", "list-2", "list-3"])
+
+    sessions_received: list[int] = []
+
+    async def fake_paginate(session, url, since_ms, label):
+        sessions_received.append(id(session))
+        return []
+
+    adapter._paginate = fake_paginate
+
+    mock_session = MagicMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+
+    mock_aiohttp = types.ModuleType("aiohttp")
+    mock_aiohttp.ClientSession = MagicMock(return_value=mock_session)
+
+    original = sys.modules.get("aiohttp")
+    sys.modules["aiohttp"] = mock_aiohttp
+    try:
+        await adapter._fetch_all(since_ms=0)
+    finally:
+        if original is None:
+            del sys.modules["aiohttp"]
+        else:
+            sys.modules["aiohttp"] = original
+
+    # One ClientSession for all three lists in the tick
+    assert mock_aiohttp.ClientSession.call_count == 1
+    # _paginate called three times, all with the same session object
+    assert len(sessions_received) == 3
+    assert len(set(sessions_received)) == 1
 
 
 # ── Cursor calculation ────────────────────────────────────────────────────────

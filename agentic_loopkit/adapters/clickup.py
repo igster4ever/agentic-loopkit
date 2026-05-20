@@ -129,16 +129,20 @@ class ClickUpAdapter(PollingAdapter):
         Fetch all tasks updated since since_ms across all configured lists.
 
         Returns a deduplicated flat list of raw task dicts.
+        One aiohttp.ClientSession is shared across all list/team requests in a single tick.
         """
+        import aiohttp  # noqa: PLC0415 — optional dep; only imported at call time
+
         tasks: list[dict] = []
 
-        if self._list_ids:
-            for list_id in self._list_ids:
-                url = f"https://api.clickup.com/api/v2/list/{list_id}/task"
-                tasks.extend(await self._paginate(url, since_ms, f"list {list_id}"))
-        elif self._team_id:
-            url = f"https://api.clickup.com/api/v2/team/{self._team_id}/task"
-            tasks.extend(await self._paginate(url, since_ms, f"team {self._team_id}"))
+        async with aiohttp.ClientSession() as session:
+            if self._list_ids:
+                for list_id in self._list_ids:
+                    url = f"https://api.clickup.com/api/v2/list/{list_id}/task"
+                    tasks.extend(await self._paginate(session, url, since_ms, f"list {list_id}"))
+            elif self._team_id:
+                url = f"https://api.clickup.com/api/v2/team/{self._team_id}/task"
+                tasks.extend(await self._paginate(session, url, since_ms, f"team {self._team_id}"))
 
         # Deduplicate by task id (a task in multiple lists appears once per list)
         seen: set[str] = set()
@@ -150,41 +154,39 @@ class ClickUpAdapter(PollingAdapter):
                 unique.append(t)
         return unique
 
-    async def _paginate(self, url: str, since_ms: int, label: str) -> list[dict]:
+    async def _paginate(self, session: Any, url: str, since_ms: int, label: str) -> list[dict]:
         """
         Paginate through a ClickUp task list endpoint until last_page=True.
 
         Used for both /list/{id}/task and /team/{id}/task — the pagination
         contract is identical across both endpoints.
+        Session is owned by _fetch_all and shared across all list requests in a tick.
         """
-        import aiohttp  # noqa: PLC0415 — optional dep; only imported at call time
-
         headers = {"Authorization": self._api_token}
         tasks: list[dict] = []
         page  = 0
 
-        async with aiohttp.ClientSession() as session:
-            while True:
-                params = {
-                    "date_updated_gt": str(since_ms),
-                    "order_by":        "updated",
-                    "page":            str(page),
-                    "page_size":       str(self._page_size),
-                    "include_closed":  "true",
-                }
-                async with session.get(url, headers=headers, params=params) as resp:
-                    if resp.status == 429:
-                        log.warning("[clickup] rate limited on %s — stopping pagination", label)
-                        break
-                    resp.raise_for_status()
-                    data = await resp.json()
-
-                batch = data.get("tasks", [])
-                tasks.extend(batch)
-
-                if data.get("last_page", True) or not batch:
+        while True:
+            params = {
+                "date_updated_gt": str(since_ms),
+                "order_by":        "updated",
+                "page":            str(page),
+                "page_size":       str(self._page_size),
+                "include_closed":  "true",
+            }
+            async with session.get(url, headers=headers, params=params) as resp:
+                if resp.status == 429:
+                    log.warning("[clickup] rate limited on %s — stopping pagination", label)
                     break
-                page += 1
+                resp.raise_for_status()
+                data = await resp.json()
+
+            batch = data.get("tasks", [])
+            tasks.extend(batch)
+
+            if data.get("last_page", True) or not batch:
+                break
+            page += 1
 
         return tasks
 
