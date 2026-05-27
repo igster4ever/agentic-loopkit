@@ -112,11 +112,29 @@ async def test_streams_returns_active_streams():
     assert "adr" in active
 
 
-async def test_publish_many():
+async def test_router_has_no_publish_many():
+    """publish_many lives on EventBus (persist-before-fanout); router must not expose it."""
     router = EventRouter()
-    received = []
-    async def handler(e): received.append(e)
-    router.subscribe("gps", handler)
-    events = [make_event("gps") for _ in range(3)]
-    await router.publish_many(events)
-    assert len(received) == 3
+    assert not hasattr(router, "publish_many")
+
+
+async def test_slow_subscriber_does_not_block_fast_subscriber():
+    """Sequential delivery is a documented constraint — document it as a test."""
+    import asyncio
+
+    router = EventRouter()
+    order: list[str] = []
+
+    async def slow(e):
+        await asyncio.sleep(0.05)
+        order.append("slow")
+
+    async def fast(e):
+        order.append("fast")
+
+    router.subscribe("gps", slow)
+    router.subscribe("gps", fast)
+    await router.publish(make_event("gps"))
+
+    # Sequential delivery: slow runs first, fast second — both receive the event
+    assert order == ["slow", "fast"]

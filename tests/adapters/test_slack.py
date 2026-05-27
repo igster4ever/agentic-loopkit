@@ -5,7 +5,7 @@ All tests mock the aiohttp HTTP layer so no real Slack API is called.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from agentic_loopkit.bus import EventBus
 from agentic_loopkit.adapters.slack import SlackAdapter, SlackEventType, _ts_to_iso
 from agentic_loopkit.events.models import Event
@@ -112,7 +112,7 @@ def test_message_to_event_handles_bot_message(tmp_path):
 async def test_poll_no_messages_returns_empty_and_none_cursor(tmp_path):
     bus = EventBus(store_dir=tmp_path)
     adapter = make_adapter(bus)
-    adapter._fetch_channel = AsyncMock(return_value=([], "1715000000.000000"))
+    adapter._fetch_all = AsyncMock(return_value=([], {}))
     events, cursor = await adapter.poll(cursor=None)
     assert events == []
     assert cursor is None
@@ -122,7 +122,8 @@ async def test_poll_returns_events_and_new_cursor(tmp_path):
     bus = EventBus(store_dir=tmp_path)
     adapter = make_adapter(bus)
     msgs = [make_message(ts="1715000002.000000"), make_message(ts="1715000001.000000")]
-    adapter._fetch_channel = AsyncMock(return_value=(msgs, "1715000002.000000"))
+    fake_events = [adapter._message_to_event(m, "C001") for m in msgs]
+    adapter._fetch_all = AsyncMock(return_value=(fake_events, {"C001": "1715000002.000000"}))
     events, cursor = await adapter.poll(cursor=None)
     assert len(events) == 2
     assert cursor == {"C001": "1715000002.000000"}
@@ -131,31 +132,29 @@ async def test_poll_returns_events_and_new_cursor(tmp_path):
 async def test_poll_uses_per_channel_cursor(tmp_path):
     bus = EventBus(store_dir=tmp_path)
     adapter = make_adapter(bus, channel_ids=["C001", "C002"])
-    captured_oldest: list = []
+    captured_per_channel: dict = {}
 
-    async def fake_fetch(channel_id, oldest):
-        captured_oldest.append((channel_id, oldest))
-        return ([], oldest)
+    async def fake_fetch_all(per_channel, default_ts):
+        captured_per_channel.update(per_channel)
+        return ([], dict(per_channel))
 
-    adapter._fetch_channel = fake_fetch
+    adapter._fetch_all = fake_fetch_all
     await adapter.poll(cursor={"C001": "111.0", "C002": "222.0"})
 
-    assert ("C001", "111.0") in captured_oldest
-    assert ("C002", "222.0") in captured_oldest
+    assert captured_per_channel["C001"] == "111.0"
+    assert captured_per_channel["C002"] == "222.0"
 
 
 async def test_poll_merges_cursors_across_channels(tmp_path):
     bus = EventBus(store_dir=tmp_path)
     adapter = make_adapter(bus, channel_ids=["C001", "C002"])
-
-    async def fake_fetch(channel_id, oldest):
-        if channel_id == "C001":
-            return ([make_message(ts="999.0")], "999.0")
-        else:
-            return ([make_message(ts="888.0")], "888.0")
-
-    adapter._fetch_channel = fake_fetch
+    msgs_c001 = [adapter._message_to_event(make_message(ts="999.0"), "C001")]
+    msgs_c002 = [adapter._message_to_event(make_message(ts="888.0"), "C002")]
+    combined_events = msgs_c001 + msgs_c002
+    combined_cursor = {"C001": "999.0", "C002": "888.0"}
+    adapter._fetch_all = AsyncMock(return_value=(combined_events, combined_cursor))
     events, cursor = await adapter.poll(cursor={})
+
     assert len(events) == 2
     assert cursor["C001"] == "999.0"
     assert cursor["C002"] == "888.0"
@@ -174,3 +173,40 @@ def test_ts_to_iso_invalid_returns_none():
 
 def test_ts_to_iso_empty_returns_none():
     assert _ts_to_iso("") is None
+
+
+# ── _fetch_channel 429 mid-pagination ─────────────────────────────────────────
+
+async def test_fetch_channel_returns_partial_results_on_429_mid_pagination(tmp_path):
+    """Page 1 succeeds; page 2 returns 429 — partial results from page 1 are returned."""
+    bus = EventBus(store_dir=tmp_path)
+    adapter = make_adapter(bus)
+
+    page1_msg = make_message(ts="1715000002.000000")
+    page1_response = {
+        "ok": True,
+        "messages": [page1_msg],
+        "has_more": True,
+        "response_metadata": {"next_cursor": "cursor-page2"},
+    }
+
+    resp_429 = AsyncMock()
+    resp_429.status = 429
+    resp_429.__aenter__ = AsyncMock(return_value=resp_429)
+    resp_429.__aexit__ = AsyncMock(return_value=False)
+
+    resp_page1 = AsyncMock()
+    resp_page1.status = 200
+    resp_page1.raise_for_status = MagicMock()
+    resp_page1.json = AsyncMock(return_value=page1_response)
+    resp_page1.__aenter__ = AsyncMock(return_value=resp_page1)
+    resp_page1.__aexit__ = AsyncMock(return_value=False)
+
+    mock_session = MagicMock()
+    mock_session.get = MagicMock(side_effect=[resp_page1, resp_429])
+
+    messages, latest_ts = await adapter._fetch_channel(mock_session, "C001", "0.0")
+
+    assert len(messages) == 1
+    assert messages[0]["ts"] == "1715000002.000000"
+    assert latest_ts == "1715000002.000000"

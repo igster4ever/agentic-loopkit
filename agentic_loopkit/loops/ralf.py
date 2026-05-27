@@ -47,12 +47,16 @@ class RALFResult:
     output:              Any            # domain-specific result (e.g. ADR draft, diagram spec)
     confidence:          float          = 1.0
     next_step:           Optional[str]  = None
-    missing_information: list[str]      = field(default_factory=list)
-    uncertainty:         Optional[str]  = None
+    missing_information: list[str]      = field(default_factory=list)  # opt-in; populated by subclasses
+    uncertainty:         Optional[str]  = None                         # opt-in; populated by subclasses
 
     @property
     def is_terminal(self) -> bool:
         return self.status in ("complete", "rejected", "error")
+
+    @property
+    def is_complete(self) -> bool:
+        return self.status == "complete"
 
     @property
     def confidence_band(self) -> str:
@@ -86,7 +90,7 @@ class RALFExecutor(ABC):
                     confidence=0.78,
                 )
 
-            async def follow_up(self, result):
+            async def follow_up(self, event, result):
                 return event.caused("adr.draft.created", "AdrDraftExecutor", result.output)
     """
 

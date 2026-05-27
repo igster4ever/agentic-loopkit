@@ -42,11 +42,11 @@ Usage:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any, Optional
 
 from ..events.models import Event
+from ..utils.time import ms_to_iso, now_ms
 from .base import PollingAdapter
 
 log = logging.getLogger("agentic_loopkit.adapter.clickup")
@@ -106,7 +106,7 @@ class ClickUpAdapter(PollingAdapter):
         seen across all fetched tasks, or None if nothing new.
         """
         # Default cursor: 24 hours ago to avoid flooding on first run
-        since_ms: int = cursor if isinstance(cursor, int) else _now_ms() - 86_400_000
+        since_ms: int = cursor if isinstance(cursor, int) else now_ms() - 86_400_000
 
         raw_tasks = await self._fetch_all(since_ms)
         if not raw_tasks:
@@ -118,7 +118,7 @@ class ClickUpAdapter(PollingAdapter):
         log.debug(
             "[clickup] fetched %d task(s) updated after %s",
             len(raw_tasks),
-            _ms_to_iso(since_ms),
+            ms_to_iso(since_ms),
         )
         return events, new_cursor
 
@@ -220,8 +220,8 @@ class ClickUpAdapter(PollingAdapter):
                 "list":        _list_name(task),
                 "list_id":     _list_id(task),
                 "url":         task.get("url", ""),
-                "date_created": _ms_to_iso(date_created) if date_created else None,
-                "date_updated": _ms_to_iso(int(task.get("date_updated", 0))),
+                "date_created": ms_to_iso(date_created) if date_created else None,
+                "date_updated": ms_to_iso(int(task.get("date_updated", 0))),
                 "priority":    _priority(task),
                 "tags":        [t.get("name") for t in task.get("tags", [])],
                 "custom_fields": _custom_fields(task),
@@ -230,16 +230,6 @@ class ClickUpAdapter(PollingAdapter):
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-
-def _now_ms() -> int:
-    return int(datetime.now(tz=timezone.utc).timestamp() * 1000)
-
-
-def _ms_to_iso(ms: int) -> str:
-    if not ms:
-        return ""
-    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
 
 def _status(task: dict) -> str:
     return (task.get("status") or {}).get("status", "")

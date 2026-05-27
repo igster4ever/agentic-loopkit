@@ -32,6 +32,9 @@ agentic_loopkit/
 │   ├── reflexion.py         # ReflexionExecutor — RALFExecutor + critique() between act() and learn()
 │   └── outcome.py           # OutcomeExecutor — RALFExecutor + rubric-governed isolated evaluation
 │
+├── utils/
+│   └── time.py              # Shared UTC helpers: utc_now(), iso_format(), now_ms(), now_unix(), ms_to_iso()
+│
 └── adapters/
     ├── base.py              # PollingAdapter — tick-driven external source bridge
     ├── clickup.py           # ClickUpAdapter + ClickUpEventType — polls ClickUp REST API

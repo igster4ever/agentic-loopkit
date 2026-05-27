@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from pathlib import Path
 from typing import Optional
 
 from .models import Event, WILDCARD_STREAM
+from ..utils.time import utc_now
 
 log = logging.getLogger("agentic_loopkit.store")
 
@@ -82,7 +83,7 @@ def compact_stream(
         return 0
 
     all_events = load_all_events(stream, store_dir)
-    cutoff = _now() - timedelta(hours=hours)
+    cutoff = utc_now() - timedelta(hours=hours)
     kept = [e for e in all_events if e.timestamp >= cutoff]
     removed = len(all_events) - len(kept)
     if removed == 0:
@@ -119,7 +120,7 @@ def _read_path(
     if not path.exists():
         return []
 
-    cutoff = _now() - timedelta(hours=hours)
+    cutoff = utc_now() - timedelta(hours=hours)
     events: list[Event] = []
 
     with path.open() as f:
@@ -150,5 +151,3 @@ def _read_path(
     return list(reversed(events))
 
 
-def _now() -> datetime:
-    return datetime.now(tz=timezone.utc)

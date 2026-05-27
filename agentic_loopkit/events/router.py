@@ -71,10 +71,6 @@ class EventRouter:
                     exc_info=True,
                 )
 
-    async def publish_many(self, events: list[Event]) -> None:
-        for event in events:
-            await self.publish(event)
-
     # ── Diagnostics ───────────────────────────────────────────────────────────
 
     def streams(self) -> list[str]:

@@ -105,6 +105,8 @@ class PlanExecutor(ABC):
                 return None
     """
 
+    max_steps: int = 50
+
     def __init__(self, name: str, bus: "EventBus") -> None:
         self.name = name
         self._bus = bus
@@ -177,6 +179,13 @@ class PlanExecutor(ABC):
             if follow_up_event is not None:
                 await self._bus.publish(follow_up_event)
             return result
+
+        if len(steps) > self.max_steps:
+            log.warning(
+                "[%s] plan() returned %d steps — truncating to max_steps=%d",
+                self.name, len(steps), self.max_steps,
+            )
+            steps = steps[:self.max_steps]
 
         log.debug("[%s] plan produced %d step(s)", self.name, len(steps))
 

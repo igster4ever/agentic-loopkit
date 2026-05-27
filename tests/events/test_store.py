@@ -122,3 +122,18 @@ def test_store_dir_created_if_absent(tmp_path):
     store = tmp_path / "deep" / "nested" / "dir"
     append_event(make_event("gps"), store_dir=store)
     assert (store / "events-gps.jsonl").exists()
+
+
+def test_load_all_events_returns_events_beyond_default_hours_window(tmp_path):
+    """load_all_events must return events older than the default 72h retention window."""
+    import json
+    path = tmp_path / "events-gps.jsonl"
+    old_event = make_event("gps")
+    old_dict = backdate(old_event, hours=200)   # well outside 72h default
+    path.write_text(json.dumps(old_dict) + "\n")
+
+    within_window = load_events("gps", store_dir=tmp_path)
+    assert len(within_window) == 0             # filtered out by default hours
+
+    all_events = load_all_events("gps", store_dir=tmp_path)
+    assert len(all_events) == 1                # load_all_events ignores the window

@@ -34,7 +34,7 @@ from typing import Any, Optional
 
 from ..events.confidence import aggregate_confidence
 from ..events.models import Event, EventMeta
-from ..events.store import load_all_events
+from ..events.store import load_all_events, load_events
 from .base import AgentBase
 
 
@@ -72,9 +72,11 @@ class ProjectionAgent(AgentBase):
         name: str,
         bus: Any,
         projection_streams: Optional[list[str]] = None,
+        hours: Optional[int] = None,
     ) -> None:
         super().__init__(name, bus)
         self._projection_streams = projection_streams
+        self._hours = hours
 
     @property
     def projection_streams(self) -> list[str]:
@@ -106,7 +108,10 @@ class ProjectionAgent(AgentBase):
         streams = self.projection_streams
         source_events: list[Event] = []
         for stream in streams:
-            source_events.extend(load_all_events(stream, store_dir=self._bus.store_dir))
+            if self._hours is not None:
+                source_events.extend(load_events(stream, store_dir=self._bus.store_dir, hours=self._hours))
+            else:
+                source_events.extend(load_all_events(stream, store_dir=self._bus.store_dir))
 
         content    = await self.materialise(source_events)
         confidence = aggregate_confidence(source_events)

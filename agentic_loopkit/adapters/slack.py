@@ -47,6 +47,7 @@ from enum import StrEnum
 from typing import Any, Optional
 
 from ..events.models import Event
+from ..utils.time import now_unix
 from .base import PollingAdapter
 
 log = logging.getLogger("agentic_loopkit.adapter.slack")
@@ -101,21 +102,9 @@ class SlackAdapter(PollingAdapter):
         where new_cursor is the updated dict with the latest ts per channel,
         or None if nothing new was found in any channel.
         """
-        # Default cursor: 24 hours ago (Slack ts = Unix float as string)
-        default_ts = str((_now_unix() - 86_400.0))
+        default_ts = str(now_unix() - 86_400.0)
         per_channel: dict[str, str] = cursor if isinstance(cursor, dict) else {}
-
-        all_events: list[Event] = []
-        new_cursor: dict[str, str] = dict(per_channel)  # start with existing
-
-        for channel_id in self._channel_ids:
-            oldest = per_channel.get(channel_id, default_ts)
-            messages, latest_ts = await self._fetch_channel(channel_id, oldest)
-            if messages:
-                all_events.extend(
-                    self._message_to_event(msg, channel_id) for msg in messages
-                )
-                new_cursor[channel_id] = latest_ts
+        all_events, new_cursor = await self._fetch_all(per_channel, default_ts)
 
         if not all_events:
             return [], None
@@ -129,8 +118,34 @@ class SlackAdapter(PollingAdapter):
 
     # ── HTTP fetching ──────────────────────────────────────────────────────────
 
+    async def _fetch_all(
+        self, per_channel: dict[str, str], default_ts: str
+    ) -> tuple[list[Event], dict[str, str]]:
+        """
+        Fetch messages for all channels, sharing one aiohttp.ClientSession.
+
+        Mirrors the ClickUp adapter pattern: one session per tick, passed
+        down to per-channel fetch calls so connection pooling is effective.
+        """
+        import aiohttp  # noqa: PLC0415 — optional dep; only imported at call time
+
+        all_events: list[Event] = []
+        new_cursor: dict[str, str] = dict(per_channel)
+
+        async with aiohttp.ClientSession() as session:
+            for channel_id in self._channel_ids:
+                oldest = per_channel.get(channel_id, default_ts)
+                messages, latest_ts = await self._fetch_channel(session, channel_id, oldest)
+                if messages:
+                    all_events.extend(
+                        self._message_to_event(msg, channel_id) for msg in messages
+                    )
+                    new_cursor[channel_id] = latest_ts
+
+        return all_events, new_cursor
+
     async def _fetch_channel(
-        self, channel_id: str, oldest: str
+        self, session: Any, channel_id: str, oldest: str
     ) -> tuple[list[dict], str]:
         """
         Fetch all messages in channel_id posted after oldest timestamp.
@@ -139,11 +154,11 @@ class SlackAdapter(PollingAdapter):
         Returns (messages, latest_ts) — latest_ts is the ts of the most recent
         message seen, or oldest if none found.
 
+        Session is owned by _fetch_all and shared across all channel requests in a tick.
+
         Slack API reference:
             https://api.slack.com/methods/conversations.history
         """
-        import aiohttp  # noqa: PLC0415 — optional dep; only imported at call time
-
         url     = "https://slack.com/api/conversations.history"
         headers = {
             "Authorization": f"Bearer {self._bot_token}",
@@ -153,43 +168,42 @@ class SlackAdapter(PollingAdapter):
         next_cursor: str = ""
         latest_ts = oldest
 
-        async with aiohttp.ClientSession() as session:
-            while True:
-                params: dict[str, Any] = {
-                    "channel": channel_id,
-                    "oldest":  oldest,
-                    "limit":   str(self._page_size),
-                    "inclusive": "false",
-                }
-                if next_cursor:
-                    params["cursor"] = next_cursor
+        while True:
+            params: dict[str, Any] = {
+                "channel": channel_id,
+                "oldest":  oldest,
+                "limit":   str(self._page_size),
+                "inclusive": "false",
+            }
+            if next_cursor:
+                params["cursor"] = next_cursor
 
-                async with session.get(url, headers=headers, params=params) as resp:
-                    if resp.status == 429:
-                        log.warning(
-                            "[slack] rate limited on channel %s — stopping pagination",
-                            channel_id,
-                        )
-                        break
-                    resp.raise_for_status()
-                    data = await resp.json()
-
-                if not data.get("ok"):
-                    error = data.get("error", "unknown")
-                    log.warning("[slack] API error for channel %s: %s", channel_id, error)
+            async with session.get(url, headers=headers, params=params) as resp:
+                if resp.status == 429:
+                    log.warning(
+                        "[slack] rate limited on channel %s — stopping pagination",
+                        channel_id,
+                    )
                     break
+                resp.raise_for_status()
+                data = await resp.json()
 
-                batch = data.get("messages", [])
-                messages.extend(batch)
+            if not data.get("ok"):
+                error = data.get("error", "unknown")
+                log.warning("[slack] API error for channel %s: %s", channel_id, error)
+                break
 
-                if batch:
-                    # Slack returns newest-first; batch[0].ts is the most recent
-                    latest_ts = batch[0].get("ts", latest_ts)
+            batch = data.get("messages", [])
+            messages.extend(batch)
 
-                meta     = data.get("response_metadata", {})
-                next_cursor = meta.get("next_cursor", "")
-                if not next_cursor or not data.get("has_more", False):
-                    break
+            if batch:
+                # Slack returns newest-first; batch[0].ts is the most recent
+                latest_ts = batch[0].get("ts", latest_ts)
+
+            meta        = data.get("response_metadata", {})
+            next_cursor = meta.get("next_cursor", "")
+            if not next_cursor or not data.get("has_more", False):
+                break
 
         return messages, latest_ts
 
@@ -227,10 +241,6 @@ class SlackAdapter(PollingAdapter):
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-
-
-def _now_unix() -> float:
-    return datetime.now(tz=timezone.utc).timestamp()
 
 
 def _ts_to_iso(ts: str) -> Optional[str]:

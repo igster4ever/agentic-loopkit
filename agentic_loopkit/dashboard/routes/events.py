@@ -15,8 +15,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from ..constants import DEFAULT_HOURS, DEFAULT_LIMIT, MAX_LIMIT
 from ..dependencies import get_bus
 from ...bus import EventBus
-from ...events.models import WILDCARD_STREAM, _iso
+from ...events.models import WILDCARD_STREAM
 from ...events.store import load_events
+from ...utils.time import iso_format
 
 log = logging.getLogger("agentic_loopkit.dashboard.routes.events")
 router = APIRouter()
@@ -62,7 +63,7 @@ async def list_events(
     if source:
         events = [e for e in events if e.source == source]
     if since:
-        events = [e for e in events if _iso(e.timestamp) >= since]
+        events = [e for e in events if iso_format(e.timestamp) >= since]
 
     total  = len(events)
     paged  = events[:limit]
@@ -111,7 +112,7 @@ async def get_event(
             {
                 "event_id":   e.event_id,
                 "event_type": str(e.event_type),
-                "timestamp":  _iso(e.timestamp),
+                "timestamp":  iso_format(e.timestamp),
             }
             for e in chain_events
             if e.event_id != event_id

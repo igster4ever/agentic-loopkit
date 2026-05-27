@@ -93,3 +93,17 @@ async def test_poll_error_does_not_update_cursor(tmp_path):
     adapter = ErrorAdapter(bus)
     await adapter.tick()
     assert adapter._cursor == 100
+
+
+async def test_null_cursor_not_persisted_on_empty_poll(tmp_path):
+    """When poll() returns new_cursor=None the cursor must not advance."""
+    bus = EventBus(store_dir=tmp_path)
+    adapter = StubAdapter(bus, events=[], new_cursor=42)
+    await adapter.tick()
+    assert adapter._cursor == 42
+
+    # Second tick: poll returns None cursor — cursor must stay at 42
+    adapter._events_to_emit = []
+    adapter._new_cursor = None
+    await adapter.tick()
+    assert adapter._cursor == 42

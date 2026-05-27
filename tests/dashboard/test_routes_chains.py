@@ -64,11 +64,25 @@ def test_build_summary_counts_streams():
     assert s["stream_count"] == 2
 
 
-def test_build_summary_error_status_on_error_event():
-    e = _make_event(event_type="things.error")
+def test_build_summary_error_status_on_meta_status_error():
+    e = _make_event(payload={"_meta": {"status": "error"}})
     s = _build_summary([e])
     assert s["status"] == "error"
     assert s["error_count"] == 1
+
+
+def test_build_summary_error_status_on_meta_status_rejected():
+    e = _make_event(payload={"_meta": {"status": "rejected"}})
+    s = _build_summary([e])
+    assert s["status"] == "error"
+    assert s["error_count"] == 1
+
+
+def test_build_summary_event_type_with_error_in_name_not_counted():
+    """Event type names containing 'error' are not counted — only _meta.status is."""
+    e = _make_event(event_type="things.error")
+    s = _build_summary([e])
+    assert s["error_count"] == 0
 
 
 def test_build_summary_counts_meta_loop_types():

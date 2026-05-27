@@ -26,17 +26,15 @@ from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any, Optional
 
+from ..utils.time import iso_format
+
 class SystemEventType(StrEnum):
     """Built-in loopkit system events.  Stream: 'system'."""
     BUS_STARTED     = "system.bus_started"
     BUS_STOPPED     = "system.bus_stopped"
     AGENT_STARTED   = "system.agent_started"
     AGENT_STOPPED   = "system.agent_stopped"
-    ADAPTER_TICK    = "system.adapter_tick"
     ADAPTER_ERROR   = "system.adapter_error"
-    LOOP_STARTED    = "system.loop_started"
-    LOOP_COMPLETE   = "system.loop_complete"
-    LOOP_REJECTED   = "system.loop_rejected"
 
 
 class TrustLevel(StrEnum):
@@ -87,7 +85,7 @@ class EventMeta:
     """
 
     phase:      Optional[str]   = None  # "observe"|"orient"|"decide"|"act"|"think"|"execute"|"retrieve"|"learn"
-    loop_type:  Optional[str]   = None  # "ooda"|"ralf"|"react"|"plan"|"reflexion"
+    loop_type:  Optional[str]   = None  # "ooda"|"ralf"|"react"|"plan"|"reflexion"|"outcome"|"conflict"
     iteration:  Optional[int]   = None  # step/iteration number within the loop
     confidence: Optional[float] = None  # 0.0–1.0
     context:    Optional[str]   = None  # human-readable reasoning for dashboard Context tab
@@ -95,14 +93,11 @@ class EventMeta:
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise to dict, omitting None values and empty tag lists."""
-        out: dict[str, Any] = {}
-        if self.phase      is not None: out["phase"]      = self.phase
-        if self.loop_type  is not None: out["loop_type"]  = self.loop_type
-        if self.iteration  is not None: out["iteration"]  = self.iteration
-        if self.confidence is not None: out["confidence"] = self.confidence
-        if self.context    is not None: out["context"]    = self.context
-        if self.tags:                   out["tags"]        = list(self.tags)
-        return out
+        import dataclasses
+        return {
+            k: v for k, v in dataclasses.asdict(self).items()
+            if v is not None and v != []
+        }
 
 
 @dataclass
@@ -142,7 +137,7 @@ class Event:
             "event_type":       str(self.event_type),
             "stream":           self.stream,
             "source":           self.source,
-            "timestamp":        _iso(self.timestamp),
+            "timestamp":        iso_format(self.timestamp),
             "payload":          self.payload,
             "causation_id":     self.causation_id,
             "correlation_id":   self.correlation_id,
@@ -183,12 +178,6 @@ class Event:
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-
-def _iso(dt: datetime) -> str:
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-
 
 def _parse(s: str) -> datetime:
     dt = datetime.fromisoformat(s.replace("Z", "+00:00"))

@@ -109,9 +109,17 @@ class ConflictResolutionExecutor(OutcomeExecutor):
         """
         ...
 
-    # evaluate() — inherited from OutcomeExecutor.
-    # Signature: evaluate(synthesis, rubric) -> (satisfied, gaps)
-    # Must call LLM with ONLY (synthesis, rubric) — no agent history.
+    @abstractmethod
+    async def evaluate(self, artifact: str, rubric: str) -> tuple[bool, list[str]]:
+        """
+        Evaluate the synthesis against the rubric in an isolated context.
+
+        Must call the LLM with ONLY ``(artifact, rubric)`` — no prior
+        reasoning history from either agent position.  This prevents anchoring.
+
+        Returns (satisfied, gaps) where gaps is an empty list when satisfied.
+        """
+        ...
 
     async def follow_up(self, event: Event, result: RALFResult) -> Optional[Event]:
         """

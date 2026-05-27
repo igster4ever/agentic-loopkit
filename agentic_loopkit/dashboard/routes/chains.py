@@ -117,7 +117,7 @@ def _build_summary(events: list[Event]) -> dict[str, Any]:
     sources   = {e.source for e in events}
     error_count = sum(
         1 for e in events
-        if "error" in str(e.event_type).lower() or "rejected" in str(e.event_type).lower()
+        if (e.meta() or {}).get("status") in ("error", "rejected")
     )
 
     ralf_loops  = 0
