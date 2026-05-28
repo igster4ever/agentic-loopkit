@@ -88,7 +88,9 @@ docs/
 ├── idioms-adoption-plan.md  # ReActExecutor / PlanExecutor / ReflexionExecutor design decisions
 ├── dashboard-architecture.md # FastAPI management API + Bun/React dashboard spec
 ├── dashboard-stack.md       # Logical layer diagram: browser / FastAPI / loopkit runtime / JSONL
-└── event-catalog.md         # All event types by module; module communication contract; trust levels
+├── event-catalog.md         # All event types by module; module communication contract; trust levels
+├── mem0-appraisal.md        # Mem0 architecture appraisal; build-bespoke recommendation for v4 memory
+└── memorykit-design.md      # agentic_memorykit v0.1 design brief (interface, storage, reconciliation)
 
 tests/
 ├── events/                  # test_models (incl. EventMeta, TrustLevel, delegation_depth), test_router, test_store
