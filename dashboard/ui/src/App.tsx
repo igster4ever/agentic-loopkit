@@ -5,6 +5,7 @@ import { EventsPage }   from './pages/EventsPage';
 import { AgentsPage }   from './pages/AgentsPage';
 import { AdaptersPage } from './pages/AdaptersPage';
 import { ChainPage }    from './pages/ChainPage';
+import { MemoryPage }   from './pages/MemoryPage';
 import { LiveTail }     from './components/livetail/LiveTail';
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
     if (path === '/live')             return <LiveTail />;
     if (path === '/agents')           return <AgentsPage />;
     if (path === '/adapters')         return <AdaptersPage />;
+    if (path === '/memory')           return <MemoryPage />;
     if (path.startsWith('/chains/'))  return <ChainPage correlationId={path.slice(8)} onNavigate={navigate} />;
     return (
       <div className="p-6 text-zinc-500 text-sm">

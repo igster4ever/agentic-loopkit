@@ -12,6 +12,7 @@ const NAV: NavItem[] = [
   { label: 'Live Tail',   href: '/live',     icon: '🔴' },
   { label: 'Agents',      href: '/agents',   icon: '🤖' },
   { label: 'Adapters',    href: '/adapters', icon: '🔌' },
+  { label: 'Memory',      href: '/memory',   icon: '🧠' },
 ];
 
 interface SidebarProps {

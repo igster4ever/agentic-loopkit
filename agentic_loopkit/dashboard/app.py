@@ -24,7 +24,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
-from .routes import events, chains, streams, agents, adapters
+from .routes import events, chains, streams, agents, adapters, memory
 from .ws import router as ws_router
 from ..bus import EventBus
 
@@ -52,6 +52,7 @@ def create_app(bus: EventBus) -> FastAPI:
     dashboard.include_router(streams.router,  prefix="/api")
     dashboard.include_router(agents.router,   prefix="/api")
     dashboard.include_router(adapters.router, prefix="/api")
+    dashboard.include_router(memory.router,   prefix="/api")
     dashboard.include_router(ws_router)
 
     if _UI_DIST.exists():
