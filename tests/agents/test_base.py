@@ -1,6 +1,6 @@
 import pytest
 from agentic_loopkit.bus import EventBus
-from agentic_loopkit.agents.base import AgentBase
+from agentic_loopkit.agents.base import AgentBase, AgentState
 from agentic_loopkit.events.models import Event
 from agentic_loopkit.events.store import load_events
 
@@ -156,3 +156,119 @@ async def test_unsubscribe_all(tmp_path):
     agent.unsubscribe_all()
     await bus.publish(make_event("gps"))
     assert agent.acted == []
+
+
+# ── AgentState ─────────────────────────────────────────────────────────────────
+
+
+def test_agent_state_defaults():
+    state = AgentState()
+    assert state.episodic == []
+    assert state.semantic == {}
+    assert state.procedural == {}
+
+
+def test_agent_state_explicit():
+    state = AgentState(episodic=["evt-1"], semantic={"k": "v"}, procedural={"p": 1})
+    assert state.episodic == ["evt-1"]
+    assert state.semantic == {"k": "v"}
+    assert state.procedural == {"p": 1}
+
+
+# ── save_state / load_state — no memory store ─────────────────────────────────
+
+
+async def test_save_state_no_memory_store_is_noop(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    agent = RecordingAgent("agent", bus)
+    # Must not raise; _memory_store is None
+    await agent.save_state(AgentState(semantic={"key": "value"}))
+
+
+async def test_load_state_no_memory_store_returns_empty(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    agent = RecordingAgent("agent", bus)
+    state = await agent.load_state()
+    assert isinstance(state, AgentState)
+    assert state.episodic == []
+    assert state.semantic == {}
+    assert state.procedural == {}
+
+
+# ── save_state / load_state — with mock memory store ─────────────────────────
+
+
+class _MockRecord:
+    def __init__(self, key, value):
+        self.key = key
+        self.value = value
+
+
+class _MockMemoryStore:
+    """Minimal duck-type stand-in for agentic_memorykit.MemoryStore."""
+
+    def __init__(self):
+        self._written: list[tuple] = []
+        self._records: list[_MockRecord] = []
+
+    async def write(self, key, value, agent_id, *, tags=(), **_kwargs):
+        self._written.append((key, value, agent_id, list(tags)))
+        self._records.append(_MockRecord(key, value))
+
+    async def list(self, agent_id=None, **_kwargs):
+        return list(self._records)
+
+
+async def test_save_state_writes_semantic_to_memory_store(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    agent = RecordingAgent("agent", bus)
+    store = _MockMemoryStore()
+    agent._memory_store = store
+
+    await agent.save_state(AgentState(semantic={"fact": "loopkit rules", "count": "42"}))
+
+    assert len(store._written) == 2
+    keys = {w[0] for w in store._written}
+    assert keys == {"fact", "count"}
+    # agent_id must match the agent name
+    assert all(w[2] == "agent" for w in store._written)
+    # tagged as semantic
+    assert all("semantic" in w[3] for w in store._written)
+
+
+async def test_save_state_skips_empty_semantic(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    agent = RecordingAgent("agent", bus)
+    store = _MockMemoryStore()
+    agent._memory_store = store
+
+    await agent.save_state(AgentState())  # no semantic facts
+
+    assert store._written == []
+
+
+async def test_load_state_reads_semantic_from_memory_store(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    agent = RecordingAgent("agent", bus)
+    store = _MockMemoryStore()
+    store._records = [_MockRecord("x", "1"), _MockRecord("y", "hello")]
+    agent._memory_store = store
+
+    state = await agent.load_state()
+
+    assert state.semantic == {"x": "1", "y": "hello"}
+    assert state.episodic == []
+    assert state.procedural == {}
+
+
+async def test_save_then_load_roundtrip(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    agent = RecordingAgent("agent", bus)
+    store = _MockMemoryStore()
+    agent._memory_store = store
+
+    await agent.save_state(AgentState(semantic={"topic": "OODA", "version": "4"}))
+    state = await agent.load_state()
+
+    assert state.semantic["topic"] == "OODA"
+    assert state.semantic["version"] == "4"

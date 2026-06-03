@@ -22,7 +22,7 @@ agentic_loopkit/
 │   └── confidence.py        # aggregate_confidence() — TrustLevel-weighted, depth-decayed mean
 │
 ├── agents/
-│   ├── base.py              # AgentBase — OODA loop (observe → orient → decide → act)
+│   ├── base.py              # AgentBase — OODA loop (observe → orient → decide → act); AgentState + load_state/save_state
 │   └── projection.py        # ProjectionAgent + ProjectionEventType — live view materialisation from event log
 │
 ├── loops/
@@ -166,6 +166,13 @@ Reactive. Subscribe to streams; pipeline runs on each event:
 - `decide(event, orientation)` → action or None (apply confidence thresholds here)
 - `act(event, action)` → side effects, publish downstream events (no LLM)
 
+**State persistence (v4):** CoALA-decomposed state hooks on every `AgentBase`.
+- `await agent.save_state(AgentState(...))` — persists semantic facts to `_memory_store` if set
+- `await agent.load_state()` → `AgentState` — loads semantic facts from `_memory_store` if set
+- `AgentState(episodic=[...], semantic={...}, procedural={...})` — never an opaque blob
+- Wire a store: `agent._memory_store = MemoryStore(store_dir)` (agentic-memorykit; no hard dep)
+- `procedural` bucket is reserved for v4+ behavioural adjustments; always `{}` in base impl
+
 ### RALFExecutor (bounded task loop)
 Retrieve → Act → Learn → Follow-up. Hard cap at `max_iterations`.
 - `retrieve(event)` → context (deterministic; no LLM)
@@ -275,7 +282,7 @@ from agentic_loopkit import (
     EventRouter, Subscriber,
     append_event, load_events,
     # Agents
-    AgentBase,
+    AgentBase, AgentState,
     ProjectionAgent, ProjectionEventType,
     # Confidence
     aggregate_confidence,
@@ -454,8 +461,8 @@ Note: governance events land on `events-governance.jsonl` alongside all other st
 # Note: system Python is blocked by PEP 668 on macOS — always use .venv/bin/python
 ```
 
-330 tests, all passing (as of 2026-05-17). Coverage: EventBus, EventRouter, EventStore,
-AgentBase (all OODA short-circuit paths), RALFExecutor (confidence rejection, learn, follow-up,
+344 tests, all passing (as of 2026-06-03). Coverage: EventBus, EventRouter, EventStore,
+AgentBase (all OODA short-circuit paths, AgentState defaults, save_state/load_state with and without memory store, roundtrip), RALFExecutor (confidence rejection, learn, follow-up,
 _post_act_hook extension), ReActExecutor (happy path, max_steps, error handling, on_step hook,
 follow-up), PlanExecutor (all-complete, partial, failed, plan() raises, step exception recovery,
 prior_outputs), ReflexionExecutor (critique hook, forced iterations, post-critique confidence

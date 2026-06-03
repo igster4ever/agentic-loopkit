@@ -597,6 +597,9 @@ from .loops.outcome    import OutcomeExecutor
 # v3 — deliberation-space primitives
 from .agents.projection import ProjectionAgent, ProjectionEventType
 from .events.confidence import aggregate_confidence
+
+# v4 — state persistence
+from .agents.base import AgentState   # CoALA-decomposed state (episodic, semantic, procedural)
 ```
 
 ---

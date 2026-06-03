@@ -21,7 +21,7 @@ from .events.models import Event, EventMeta, SystemEventType, TrustLevel, WILDCA
 from .events.router import EventRouter, Subscriber
 from .events.store import append_event, load_events
 from .events.confidence import aggregate_confidence
-from .agents.base import AgentBase
+from .agents.base import AgentBase, AgentState
 from .agents.projection import ProjectionAgent, ProjectionEventType
 from .loops.ralf import RALFExecutor, RALFResult, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, CONFIDENCE_HIGH
 from .loops.react import ReActExecutor, ReActResult, ReActStep
@@ -49,6 +49,7 @@ __all__ = [
     "aggregate_confidence",
     # Agents
     "AgentBase",
+    "AgentState",
     "ProjectionAgent",
     "ProjectionEventType",
     # Executors — RALF

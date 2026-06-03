@@ -63,6 +63,9 @@ executor patterns layered on top.
 ├────────────────┼────────────────────────────────────────────────────────────┤
 │ AgentBase      │ OODA reactive agent. Subscribes to streams. Runs the 4-   │
 │                │ phase pipeline on each event. LLM in orient() only.       │
+│                │ State persistence: save_state(AgentState) / load_state()  │
+│                │ decomposed by CoALA type (episodic, semantic, procedural). │
+│                │ Wire MemoryStore via _memory_store for semantic facts.     │
 ├────────────────┼────────────────────────────────────────────────────────────┤
 │ RALFExecutor   │ Bounded task loop. Triggered by a single event. Iterates  │
 │                │ retrieve → act → learn → follow_up. Hard cap on loops.    │
