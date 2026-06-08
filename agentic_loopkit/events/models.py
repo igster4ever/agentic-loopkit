@@ -32,9 +32,12 @@ class SystemEventType(StrEnum):
     """Built-in loopkit system events.  Stream: 'system'."""
     BUS_STARTED     = "system.bus_started"
     BUS_STOPPED     = "system.bus_stopped"
+    BUS_PRESSURE    = "system.bus_pressure"
     AGENT_STARTED   = "system.agent_started"
     AGENT_STOPPED   = "system.agent_stopped"
     ADAPTER_ERROR   = "system.adapter_error"
+    ADAPTER_ALIVE   = "system.adapter_alive"
+    ADAPTER_STALLED = "system.adapter_stalled"
 
 
 class TrustLevel(StrEnum):

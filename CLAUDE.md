@@ -461,7 +461,7 @@ Note: governance events land on `events-governance.jsonl` alongside all other st
 # Note: system Python is blocked by PEP 668 on macOS — always use .venv/bin/python
 ```
 
-344 tests, all passing (as of 2026-06-03). Coverage: EventBus, EventRouter, EventStore,
+370 tests, all passing (as of 2026-06-08). Coverage: EventBus, EventRouter, EventStore,
 AgentBase (all OODA short-circuit paths, AgentState defaults, save_state/load_state with and without memory store, roundtrip), RALFExecutor (confidence rejection, learn, follow-up,
 _post_act_hook extension), ReActExecutor (happy path, max_steps, error handling, on_step hook,
 follow-up), PlanExecutor (all-complete, partial, failed, plan() raises, step exception recovery,
@@ -472,9 +472,12 @@ loop, gaps fed to next act() via prior_result, learn sequence, max_iterations, f
 isolation contract — evaluate signature verified, default max_iterations=3),
 EventMeta (to_dict field omission, event.meta() helper),
 TrustLevel + delegation_depth (Event defaults, round-trip serialisation, caused() propagation),
-PollingAdapter (cursor, error event), ClickUpAdapter (payload mapping, dedup, cursor),
+PollingAdapter (cursor, error event, adapter_alive/stalled liveness events, tick registration),
+ClickUpAdapter (payload mapping, dedup, cursor),
 SlackAdapter (event mapping, per-channel cursor, pagination, rate-limit handling),
 LocalGitAdapter (git log parsing, SHA cursor, first-run since window, real-repo integration),
+EventBus backpressure (bus_pressure signal, threshold config, counter reset, system-event exclusion),
+EventBus shutdown (is_stopping, drain_timeout, active tick drain, force-stop after timeout),
 dashboard routes (streams, events filter/pagination, events/{id} + related chain, chains DAG +
 summary, agents, adapters), dashboard chain builder (edge derivation, summary.status logic),
 dashboard WS /ws/tail (connect/disconnect, stream filter, router lifecycle, queue-full drop),

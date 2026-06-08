@@ -13,13 +13,12 @@ Update this file when adding new event types to either module.
 |---|---|---|
 | `system.bus_started` | `EventBus` | monitoring agents |
 | `system.bus_stopped` | `EventBus` | monitoring agents |
+| `system.bus_pressure` | `EventBus` | backpressure handlers, monitoring agents |
 | `system.agent_started` | `EventBus` | monitoring agents |
 | `system.agent_stopped` | `EventBus` | monitoring agents |
-| `system.adapter_tick` | `PollingAdapter` | monitoring agents |
+| `system.adapter_alive` | `PollingAdapter` | monitoring agents |
 | `system.adapter_error` | `PollingAdapter` | alerting agents |
-| `system.loop_started` | executors (RALF/ReAct/Plan/…) | monitoring agents |
-| `system.loop_complete` | executors | downstream agents |
-| `system.loop_rejected` | executors (confidence < 0.40) | retry / escalation agents |
+| `system.adapter_stalled` | `PollingAdapter` | alerting agents, kill-switch |
 
 ### `projection.*` — Live document materialisation
 
