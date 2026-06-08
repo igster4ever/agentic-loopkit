@@ -461,8 +461,8 @@ Note: governance events land on `events-governance.jsonl` alongside all other st
 # Note: system Python is blocked by PEP 668 on macOS — always use .venv/bin/python
 ```
 
-370 tests, all passing (as of 2026-06-08). Coverage: EventBus, EventRouter, EventStore,
-AgentBase (all OODA short-circuit paths, AgentState defaults, save_state/load_state with and without memory store, roundtrip), RALFExecutor (confidence rejection, learn, follow-up,
+393 tests, all passing (as of 2026-06-08). Coverage: EventBus, EventRouter, EventStore,
+AgentBase (all OODA short-circuit paths, AgentState defaults + world_model field, save_state/load_state with and without memory store, semantic/world_model tag separation, roundtrip), RALFExecutor (confidence rejection, learn, follow-up,
 _post_act_hook extension), ReActExecutor (happy path, max_steps, error handling, on_step hook,
 follow-up), PlanExecutor (all-complete, partial, failed, plan() raises, step exception recovery,
 prior_outputs), ReflexionExecutor (critique hook, forced iterations, post-critique confidence
@@ -487,7 +487,8 @@ KillSwitchAgent (halt/quarantine/human_override enforcement, TrustLevel.HIGH on 
 policy miss ignored, self-exclusion prevents feedback loop, causation chain preserved),
 ConflictResolutionExecutor (dispute_resolved on complete, human_override on exhaustion/error,
 evaluate isolation contract, correlation_id threading, causation chain),
-module boundaries (govkit→loopkit one-way, loopkit→govkit zero, governance stream namespace).
+module boundaries (govkit→loopkit one-way, loopkit→govkit zero, governance stream namespace),
+PerformanceMeasure (mean_confidence, event_count, governance_flags, trend improving/stable/degrading/insufficient_data, follow_up_rate=None baseline, agent filtering, empty list handling).
 
 ## Dashboard
 

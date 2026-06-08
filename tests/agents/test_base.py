@@ -166,6 +166,7 @@ def test_agent_state_defaults():
     assert state.episodic == []
     assert state.semantic == {}
     assert state.procedural == {}
+    assert state.world_model == {}
 
 
 def test_agent_state_explicit():
@@ -173,6 +174,13 @@ def test_agent_state_explicit():
     assert state.episodic == ["evt-1"]
     assert state.semantic == {"k": "v"}
     assert state.procedural == {"p": 1}
+    assert state.world_model == {}
+
+
+def test_agent_state_world_model_explicit():
+    state = AgentState(world_model={"stall_pattern": "adapter stalls on 502"})
+    assert state.world_model == {"stall_pattern": "adapter stalls on 502"}
+    assert state.semantic == {}  # independent of world_model
 
 
 # ── save_state / load_state — no memory store ─────────────────────────────────
@@ -193,15 +201,17 @@ async def test_load_state_no_memory_store_returns_empty(tmp_path):
     assert state.episodic == []
     assert state.semantic == {}
     assert state.procedural == {}
+    assert state.world_model == {}
 
 
 # ── save_state / load_state — with mock memory store ─────────────────────────
 
 
 class _MockRecord:
-    def __init__(self, key, value):
+    def __init__(self, key, value, tags=None):
         self.key = key
         self.value = value
+        self.tags: list[str] = list(tags) if tags else []
 
 
 class _MockMemoryStore:
@@ -213,10 +223,13 @@ class _MockMemoryStore:
 
     async def write(self, key, value, agent_id, *, tags=(), **_kwargs):
         self._written.append((key, value, agent_id, list(tags)))
-        self._records.append(_MockRecord(key, value))
+        self._records.append(_MockRecord(key, value, list(tags)))
 
-    async def list(self, agent_id=None, **_kwargs):
-        return list(self._records)
+    async def list(self, agent_id=None, tags=(), **_kwargs):
+        results = list(self._records)
+        if tags:
+            results = [r for r in results if all(t in r.tags for t in tags)]
+        return results
 
 
 async def test_save_state_writes_semantic_to_memory_store(tmp_path):
@@ -251,12 +264,16 @@ async def test_load_state_reads_semantic_from_memory_store(tmp_path):
     bus = EventBus(store_dir=tmp_path)
     agent = RecordingAgent("agent", bus)
     store = _MockMemoryStore()
-    store._records = [_MockRecord("x", "1"), _MockRecord("y", "hello")]
+    store._records = [
+        _MockRecord("x", "1", ["semantic"]),
+        _MockRecord("y", "hello", ["semantic"]),
+    ]
     agent._memory_store = store
 
     state = await agent.load_state()
 
     assert state.semantic == {"x": "1", "y": "hello"}
+    assert state.world_model == {}
     assert state.episodic == []
     assert state.procedural == {}
 
@@ -272,3 +289,85 @@ async def test_save_then_load_roundtrip(tmp_path):
 
     assert state.semantic["topic"] == "OODA"
     assert state.semantic["version"] == "4"
+    assert state.world_model == {}
+
+
+# ── world_model ────────────────────────────────────────────────────────────────
+
+
+async def test_save_state_writes_world_model_to_memory_store(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    agent = RecordingAgent("agent", bus)
+    store = _MockMemoryStore()
+    agent._memory_store = store
+
+    await agent.save_state(AgentState(world_model={"stall": "on 502"}))
+
+    wm_writes = [w for w in store._written if "world_model" in w[3]]
+    assert len(wm_writes) == 1
+    assert wm_writes[0][0] == "stall"
+    assert wm_writes[0][1] == "on 502"
+    assert wm_writes[0][2] == "agent"
+
+
+async def test_save_state_world_model_tagged_separately_from_semantic(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    agent = RecordingAgent("agent", bus)
+    store = _MockMemoryStore()
+    agent._memory_store = store
+
+    await agent.save_state(AgentState(
+        semantic={"fact": "x"},
+        world_model={"cause": "y"},
+    ))
+
+    sem_writes = [w for w in store._written if "semantic"    in w[3]]
+    wm_writes  = [w for w in store._written if "world_model" in w[3]]
+    assert len(sem_writes) == 1 and sem_writes[0][0] == "fact"
+    assert len(wm_writes)  == 1 and wm_writes[0][0]  == "cause"
+
+
+async def test_load_state_reads_world_model_from_memory_store(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    agent = RecordingAgent("agent", bus)
+    store = _MockMemoryStore()
+    store._records = [
+        _MockRecord("stall", "on 502", ["world_model"]),
+        _MockRecord("depth_limit", "3", ["world_model"]),
+    ]
+    agent._memory_store = store
+
+    state = await agent.load_state()
+
+    assert state.world_model == {"stall": "on 502", "depth_limit": "3"}
+    assert state.semantic == {}
+
+
+async def test_world_model_records_not_in_semantic(tmp_path):
+    """world_model-tagged records must not bleed into semantic."""
+    bus = EventBus(store_dir=tmp_path)
+    agent = RecordingAgent("agent", bus)
+    store = _MockMemoryStore()
+    store._records = [
+        _MockRecord("fact", "value", ["semantic"]),
+        _MockRecord("cause", "effect", ["world_model"]),
+    ]
+    agent._memory_store = store
+
+    state = await agent.load_state()
+
+    assert "cause" not in state.semantic
+    assert "fact"  not in state.world_model
+
+
+async def test_world_model_round_trip(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    agent = RecordingAgent("agent", bus)
+    store = _MockMemoryStore()
+    agent._memory_store = store
+
+    await agent.save_state(AgentState(world_model={"adapter_retries": "3"}))
+    state = await agent.load_state()
+
+    assert state.world_model["adapter_retries"] == "3"
+    assert state.semantic == {}

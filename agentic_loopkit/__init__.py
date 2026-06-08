@@ -23,6 +23,7 @@ from .events.store import append_event, load_events
 from .events.confidence import aggregate_confidence
 from .agents.base import AgentBase, AgentState
 from .agents.projection import ProjectionAgent, ProjectionEventType
+from .agents.performance import PerformanceMeasure, PerformanceScore, SimpleConfidencePerformance
 from .loops.ralf import RALFExecutor, RALFResult, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, CONFIDENCE_HIGH
 from .loops.react import ReActExecutor, ReActResult, ReActStep
 from .loops.plan import PlanExecutor, PlanResult, PlanStep
@@ -52,6 +53,9 @@ __all__ = [
     "AgentState",
     "ProjectionAgent",
     "ProjectionEventType",
+    "PerformanceMeasure",
+    "PerformanceScore",
+    "SimpleConfidencePerformance",
     # Executors — RALF
     "RALFExecutor",
     "RALFResult",
