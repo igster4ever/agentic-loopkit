@@ -24,11 +24,13 @@ from .events.confidence import aggregate_confidence
 from .agents.base import AgentBase, AgentState
 from .agents.projection import ProjectionAgent, ProjectionEventType
 from .agents.performance import PerformanceMeasure, PerformanceScore, SimpleConfidencePerformance
+from .agents.problem_generator import ProblemGeneratorAgent, AgendaEventType, AgendaItem
 from .loops.ralf import RALFExecutor, RALFResult, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, CONFIDENCE_HIGH
 from .loops.react import ReActExecutor, ReActResult, ReActStep
 from .loops.plan import PlanExecutor, PlanResult, PlanStep
 from .loops.reflexion import ReflexionExecutor
 from .loops.outcome import OutcomeExecutor
+from .loops.utility import UtilityExecutor, UtilityResult, UtilityCandidate
 from .adapters.base import PollingAdapter
 from .adapters.clickup import ClickUpAdapter, ClickUpEventType
 from .adapters.slack import SlackAdapter, SlackEventType
@@ -56,6 +58,9 @@ __all__ = [
     "PerformanceMeasure",
     "PerformanceScore",
     "SimpleConfidencePerformance",
+    "ProblemGeneratorAgent",
+    "AgendaEventType",
+    "AgendaItem",
     # Executors — RALF
     "RALFExecutor",
     "RALFResult",
@@ -74,6 +79,10 @@ __all__ = [
     "ReflexionExecutor",
     # Executors — Outcome
     "OutcomeExecutor",
+    # Executors — Utility
+    "UtilityExecutor",
+    "UtilityResult",
+    "UtilityCandidate",
     # Adapters
     "PollingAdapter",
     "ClickUpAdapter",

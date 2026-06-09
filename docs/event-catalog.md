@@ -29,6 +29,22 @@ Update this file when adding new event types to either module.
 Payload fields: `projection_id` (agent name), `content` (materialised document string),
 `confidence` (aggregate_confidence() result, may be `null`), `event_count`, `streams`.
 
+### `agenda.*` — Proactive exploration agenda
+
+Emitted by `ProblemGeneratorAgent` subclasses. Each item represents a gap or opportunity
+identified by the LLM `explore()` phase in `orient()`.
+
+| Event type | Published by | Condition | Typical subscribers |
+|---|---|---|---|
+| `agenda.item_added` | `ProblemGeneratorAgent` subclass | Trigger event received; `explore()` returns items above `min_priority` | planning agents, dashboard, human review |
+| `agenda.item_addressed` | consumer | Problem identified in an agenda item has been resolved | `ProblemGeneratorAgent`, audit log |
+| `agenda.item_expired` | consumer | Agenda item TTL elapsed without resolution | `ProblemGeneratorAgent`, audit log |
+
+Payload fields for `agenda.item_added`: `description`, `priority` (0.0–1.0), `rationale`,
+`context_streams` (list of streams loaded to generate this item), `tags`, `ttl_hours`.
+`agenda.item_addressed` and `agenda.item_expired` are consumer-defined — loopkit defines the
+stream name only; consumers emit them when appropriate.
+
 ### Consumer-defined streams
 
 Loopkit places no constraints on consumer event types. Convention: `<stream>.<action>`.
@@ -62,6 +78,8 @@ All `governance.*` events are persisted and inspectable — the auditor is audit
 | `governance.human_override` | `ConflictResolutionExecutor` / `KillSwitchAgent` | consensus not reached or escalation policy | audit log, downstream agents |
 | `governance.halt` | `KillSwitchAgent` | correlation chain halted by policy | downstream agents, audit log |
 | `governance.quarantine` | `KillSwitchAgent` | source quarantined by policy | policy router, alerting |
+| `governance.policy_recommendation` | `GovernanceLearningAgent` | analysis window full or bus started; confidence ≥ `min_confidence` | operators, dashboards, `KillSwitchAgent` policy wiring |
+| `governance.policy_applied` | consumer / operator | policy recommendation accepted and applied | `GovernanceLearningAgent` (self-excluded), audit log |
 
 `governance.confidence_breach` payload includes `confidence` (float) and `threshold` (float)
 in addition to the standard `flagged_event_id`, `flagged_event_type`, `flagged_source`, `detail` fields.

@@ -23,10 +23,10 @@ The OODA+ReAct composition pattern is documented as the canonical wiring example
 | Replay-as-archaeology | **Document** | `docs/idioms-adoption-plan.md` | v3-2 | ✅ Done 2026-05-12 |
 | ConflictResolutionExecutor | **Build** | `agentic_govkit/loops/conflict.py` | v3-3 | ✅ Built 2026-05-15 |
 | Bus backpressure + liveness + graceful shutdown | **Build** | `bus.py`, `adapters/base.py` | v4-3 | ✅ Built 2026-06-08 |
-| ProblemGeneratorAgent + `agenda.*` stream | **Build** | `agents/problem_generator.py` | v4-5 | 📄 Designed 2026-06-08 |
-| UtilityExecutor (generate-and-rank) | **Build** | `loops/utility.py` | v4-6 | 📄 Designed 2026-06-08 |
-| `world_model` bucket in `AgentState` + `PerformanceMeasure` | **Build** | `agents/base.py`, `agents/performance.py` | v4-7 | 📄 Designed 2026-06-08 |
-| GovernanceLearningAgent | **Build** | `agentic_govkit/agents/learning.py` | v4-8 | 📄 Designed 2026-06-08 |
+| ProblemGeneratorAgent + `agenda.*` stream | **Build** | `agents/problem_generator.py` | v4-5 | ✅ Built 2026-06-09 |
+| UtilityExecutor (generate-and-rank) | **Build** | `loops/utility.py` | v4-6 | ✅ Built 2026-06-09 |
+| `world_model` bucket in `AgentState` + `PerformanceMeasure` | **Build** | `agents/base.py`, `agents/performance.py` | v4-7 | ✅ Built 2026-06-08 |
+| GovernanceLearningAgent | **Build** | `agentic_govkit/agents/learning.py` | v4-8 | ✅ Built 2026-06-09 |
 
 ---
 
@@ -605,6 +605,15 @@ from .events.confidence import aggregate_confidence
 
 # v4 — state persistence
 from .agents.base import AgentState   # CoALA-decomposed state (episodic, semantic, procedural)
+
+# v4-5 — proactive exploration
+from .agents.problem_generator import ProblemGeneratorAgent, AgendaEventType, AgendaItem
+
+# v4-6 — generate-and-rank
+from .loops.utility import UtilityExecutor, UtilityResult, UtilityCandidate
+
+# v4-8 — governance learning (agentic_govkit public API)
+# from agentic_govkit import GovernanceLearningAgent, PolicyRecommendation
 ```
 
 ---
@@ -634,10 +643,10 @@ from .agents.base import AgentState   # CoALA-decomposed state (episodic, semant
 16. ✅ `adapters/base.py` — liveness tracking, stall threshold, adapter_states() (2026-06-08)
 17. ✅ `agents/base.py` — `world_model` field in `AgentState`; save_state/load_state tag separation (2026-06-08)
 18. ✅ `agents/performance.py` — `PerformanceMeasure` protocol + `SimpleConfidencePerformance` (2026-06-08)
-19. ⬜ `agents/problem_generator.py` — `ProblemGeneratorAgent` + `AgendaEventType` + `AgendaItem` (see `docs/problem-generator-design.md`)
-20. ⬜ `loops/utility.py` — `UtilityExecutor` + `UtilityResult` + `UtilityCandidate` (see `docs/utility-executor-design.md`)
-21. ⬜ `agentic_govkit/agents/learning.py` — `GovernanceLearningAgent` + `PolicyRecommendation` (see `docs/governance-learning-agent.md`)
-22. ⬜ `agentic_govkit/events/models.py` — add `POLICY_RECOMMENDATION` + `POLICY_APPLIED` to `GovernanceEventType`
+19. ✅ `agents/problem_generator.py` — `ProblemGeneratorAgent` + `AgendaEventType` + `AgendaItem` (2026-06-09)
+20. ✅ `loops/utility.py` — `UtilityExecutor` + `UtilityResult` + `UtilityCandidate` (2026-06-09)
+21. ✅ `agentic_govkit/agents/learning.py` — `GovernanceLearningAgent` + `PolicyRecommendation` (2026-06-09)
+22. ✅ `agentic_govkit/events/models.py` — `POLICY_RECOMMENDATION` + `POLICY_APPLIED` added to `GovernanceEventType` (2026-06-09)
 
 ---
 

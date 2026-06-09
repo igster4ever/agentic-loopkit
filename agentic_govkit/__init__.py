@@ -29,12 +29,15 @@ Public API:
 
 from agentic_govkit.agents.audit import AuditAgent
 from agentic_govkit.agents.killswitch import KillSwitchAgent
+from agentic_govkit.agents.learning import GovernanceLearningAgent, PolicyRecommendation
 from agentic_govkit.events.models import GovernanceEventType
 from agentic_govkit.loops.conflict import ConflictResolutionExecutor
 
 __all__ = [
     "AuditAgent",
     "KillSwitchAgent",
+    "GovernanceLearningAgent",
+    "PolicyRecommendation",
     "GovernanceEventType",
     "ConflictResolutionExecutor",
 ]

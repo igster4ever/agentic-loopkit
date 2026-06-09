@@ -461,7 +461,7 @@ Note: governance events land on `events-governance.jsonl` alongside all other st
 # Note: system Python is blocked by PEP 668 on macOS — always use .venv/bin/python
 ```
 
-393 tests, all passing (as of 2026-06-08). Coverage: EventBus, EventRouter, EventStore,
+431 tests, all passing (as of 2026-06-09). Coverage: EventBus, EventRouter, EventStore,
 AgentBase (all OODA short-circuit paths, AgentState defaults + world_model field, save_state/load_state with and without memory store, semantic/world_model tag separation, roundtrip), RALFExecutor (confidence rejection, learn, follow-up,
 _post_act_hook extension), ReActExecutor (happy path, max_steps, error handling, on_step hook,
 follow-up), PlanExecutor (all-complete, partial, failed, plan() raises, step exception recovery,
@@ -488,7 +488,10 @@ policy miss ignored, self-exclusion prevents feedback loop, causation chain pres
 ConflictResolutionExecutor (dispute_resolved on complete, human_override on exhaustion/error,
 evaluate isolation contract, correlation_id threading, causation chain),
 module boundaries (govkit→loopkit one-way, loopkit→govkit zero, governance stream namespace),
-PerformanceMeasure (mean_confidence, event_count, governance_flags, trend improving/stable/degrading/insufficient_data, follow_up_rate=None baseline, agent filtering, empty list handling).
+PerformanceMeasure (mean_confidence, event_count, governance_flags, trend improving/stable/degrading/insufficient_data, follow_up_rate=None baseline, agent filtering, empty list handling),
+ProblemGeneratorAgent (observe gate, min_priority filter, decide None on empty, act emits agenda.item_added, _meta phase/loop_type, causation/correlation, should_explore override, context_streams defaults),
+UtilityExecutor (winner selection, sorted descending, below_threshold, no_candidates, error, follow_up on complete only, isolation contract, criteria_scores, retrieve default, min_utility boundary),
+GovernanceLearningAgent (window accumulation, window trigger, self-exclusion, policy_recommendation/applied exclusion, bus_started trigger, orient calls analyse, confidence filtering, act payload/TrustLevel.HIGH/_meta, window clear, evidence_event_ids, module boundary import check).
 
 ## Dashboard
 

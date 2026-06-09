@@ -99,6 +99,13 @@ executor patterns layered on top.
 │                │ filtering. The wiki page is a projection; the event log   │
 │                │ is the source of truth.                                   │
 ├────────────────┼────────────────────────────────────────────────────────────┤
+│ ProblemGen-    │ AgentBase subclass (AIMA "Problem Generator" module).      │
+│ eratorAgent    │ Proactive exploration: subscribes to trigger streams,      │
+│                │ loads context_streams, calls explore() (LLM phase in      │
+│                │ orient()) to produce AgendaItems. Emits agenda.item_added  │
+│                │ for each item above min_priority. should_explore() hook    │
+│                │ for throttling. Context_streams defaults to subscriptions. │
+├────────────────┼────────────────────────────────────────────────────────────┤
 │ Event          │ Immutable record. stream auto-derived from event_type     │
 │                │ prefix. causation_id + correlation_id for traceability.   │
 │                │ trust_level (TrustLevel enum) + delegation_depth (int)    │
@@ -333,7 +340,8 @@ ISO string, page token, sequence number, or a set of seen IDs.
 
 ### Executors (see `docs/idioms-adoption-plan.md`)
 
-All executor variants extend `RALFExecutor` via `_post_act_hook()` — never by copying `run()`.
+RALF variants extend `RALFExecutor` via `_post_act_hook()` — never by copying `run()`.
+`UtilityExecutor` is standalone (ABC) — generate-and-rank single-pass, not a RALF variant.
 
 | Executor | File | Pattern | Status |
 |---|---|---|---|
@@ -341,6 +349,7 @@ All executor variants extend `RALFExecutor` via `_post_act_hook()` — never by 
 | `PlanExecutor` | `loops/plan.py` | LLM decomposition + per-step execution | ✅ Built (2026-05-04) |
 | `ReflexionExecutor` | `loops/reflexion.py` | RALF + same-context self-critique | ✅ Built (2026-05-05) |
 | `OutcomeExecutor` | `loops/outcome.py` | RALF + rubric-governed isolated evaluation | ✅ Built (2026-05-07) |
+| `UtilityExecutor` | `loops/utility.py` | Standalone generate-and-rank; LLM in `generate_candidates()` + `utility_score()` | ✅ Built (2026-06-09) |
 
 ### EventMeta convention (see `CLAUDE.md`)
 
@@ -470,6 +479,11 @@ Install via `pip install agentic-loopkit[governance]`.
   thresholds are breached. Optional `confidence_threshold` parameter auto-flags events where
   `_meta.confidence < threshold`. All decisions are themselves events on the bus — the auditor
   is fully observable.
+- **`GovernanceLearningAgent`** — AIMA "Learning Element" for govkit. Accumulates governance events
+  into a rolling window; when the buffer reaches `analysis_window` events (or on `bus.started`),
+  calls `analyse()` (LLM phase in `orient()`) to identify policy drift. Emits
+  `governance.policy_recommendation` per recommendation at `TrustLevel.HIGH`. Self-excludes own
+  events and `policy_recommendation`/`policy_applied` to prevent feedback loops.
 - **`GovernanceEventType`** — full vocabulary:
   - `governance.depth_exceeded` — `delegation_depth > max_delegation_depth`
   - `governance.trust_escalation` — `trust_level == UNTRUSTED`
@@ -478,6 +492,10 @@ Install via `pip install agentic-loopkit[governance]`.
   - `governance.dispute_opened` — competing agent interpretations of same entity
   - `governance.dispute_resolved` — dispute closed (consensus or human override)
   - `governance.human_override` — HIGH-trust human decision supersedes agent synthesis
+  - `governance.halt` — correlation chain halted by `KillSwitchAgent`
+  - `governance.quarantine` — source quarantined by `KillSwitchAgent`
+  - `governance.policy_recommendation` — policy adjustment recommended by `GovernanceLearningAgent`
+  - `governance.policy_applied` — policy recommendation accepted and applied by operator
 - **Module boundary contract**: `agentic_govkit → agentic_loopkit` (public API only); never reversed.
   Enforced by `tests/govkit/test_module_boundaries.py`.
 
