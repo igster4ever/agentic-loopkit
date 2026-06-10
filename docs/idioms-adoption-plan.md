@@ -27,6 +27,10 @@ The OODA+ReAct composition pattern is documented as the canonical wiring example
 | UtilityExecutor (generate-and-rank) | **Build** | `loops/utility.py` | v4-6 | ✅ Built 2026-06-09 |
 | `world_model` bucket in `AgentState` + `PerformanceMeasure` | **Build** | `agents/base.py`, `agents/performance.py` | v4-7 | ✅ Built 2026-06-08 |
 | GovernanceLearningAgent | **Build** | `agentic_govkit/agents/learning.py` | v4-8 | ✅ Built 2026-06-09 |
+| `AgentTestHarness` + `AsyncLLMCallable` + `TestTask`/`TestSuiteResult` | **Build** | `agentic_loopkit/testing.py` | v4-4 | ⬜ Pending |
+| `FailurePatternAgent` + `FailureSignature` | **Build** | `agents/failure_pattern.py` | v5-1 | ⬜ Pending |
+| `HarnessEventType` + `harness.*` stream | **Build** | `events/models.py` extension | v5-2 | ⬜ Pending |
+| `SelfHarnessExecutor` | **Build** | `loops/self_harness.py` | v5-3 | ⬜ Depends on v4-4 + v5-1 |
 
 ---
 
@@ -647,6 +651,14 @@ from .loops.utility import UtilityExecutor, UtilityResult, UtilityCandidate
 20. ✅ `loops/utility.py` — `UtilityExecutor` + `UtilityResult` + `UtilityCandidate` (2026-06-09)
 21. ✅ `agentic_govkit/agents/learning.py` — `GovernanceLearningAgent` + `PolicyRecommendation` (2026-06-09)
 22. ✅ `agentic_govkit/events/models.py` — `POLICY_RECOMMENDATION` + `POLICY_APPLIED` added to `GovernanceEventType` (2026-06-09)
+23. ⬜ `agentic_loopkit/testing.py` — `AgentTestHarness` + `AsyncLLMCallable` + `TestTask` / `TestResult` / `TestSuiteResult`; `regression_gate()` static method; tests in `tests/test_harness.py` (spec: `docs/agent-testkit-design.md`)
+
+### v5 — self-improvement primitives
+_Sourced from: arXiv:2606.09498 "Self-Harness: Harnesses That Improve Themselves" (2026-06-10)_
+
+24. ⬜ `events/models.py` — `HarnessEventType` StrEnum: `harness.edit_proposed`, `harness.edit_accepted`, `harness.edit_rejected`, `harness.candidate_eval`; update `event-catalog.md`
+25. ⬜ `agents/failure_pattern.py` — `FailurePatternAgent(ProjectionAgent)` + `FailureSignature` dataclass; subscribes to `system.*` + `governance.*`; clusters error events by `(terminal_cause, causal_status, agent_mechanism)`; emits `system.failure_pattern_detected`; tests in `tests/agents/test_failure_pattern.py`
+26. ⬜ `loops/self_harness.py` — `SelfHarnessExecutor(OutcomeExecutor)`: `retrieve()` loads `FailurePatternAgent` outputs; `act()` delegates to `UtilityExecutor` for K candidate proposals; `evaluate()` calls `AgentTestHarness.regression_gate()` (deterministic — no LLM); `follow_up()` emits `harness.edit_accepted` or `harness.edit_rejected`; tests in `tests/loops/test_self_harness.py` (spec: TODO — draft once v4-4 + v5-1 are built)
 
 ---
 

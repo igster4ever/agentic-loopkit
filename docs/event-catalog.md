@@ -19,6 +19,7 @@ Update this file when adding new event types to either module.
 | `system.adapter_alive` | `PollingAdapter` | monitoring agents |
 | `system.adapter_error` | `PollingAdapter` | alerting agents |
 | `system.adapter_stalled` | `PollingAdapter` | alerting agents, kill-switch |
+| `system.failure_pattern_detected` | `FailurePatternAgent` subclass _(v5-1, pending)_ | `GovernanceLearningAgent`, `SelfHarnessExecutor`, dashboard |
 
 ### `projection.*` — Live document materialisation
 
@@ -44,6 +45,25 @@ Payload fields for `agenda.item_added`: `description`, `priority` (0.0–1.0), `
 `context_streams` (list of streams loaded to generate this item), `tags`, `ttl_hours`.
 `agenda.item_addressed` and `agenda.item_expired` are consumer-defined — loopkit defines the
 stream name only; consumers emit them when appropriate.
+
+### `harness.*` — Harness self-improvement _(v5-2, pending)_
+
+Emitted during harness evolution runs. Each candidate edit generates `candidate_eval`
+events; accepted and rejected decisions are always persisted for audit.
+
+| Event type | Published by | Condition | Typical subscribers |
+|---|---|---|---|
+| `harness.edit_proposed` | `SelfHarnessExecutor` | Candidate harness delta generated | audit log, dashboard |
+| `harness.edit_accepted` | `SelfHarnessExecutor` | Passed `AgentTestHarness.regression_gate()` | operators, governance stream |
+| `harness.edit_rejected` | `SelfHarnessExecutor` | Failed regression gate or no surface modified | audit log |
+| `harness.candidate_eval` | `SelfHarnessExecutor` | Per-candidate test result from `AgentTestHarness` | audit log, dashboard |
+
+Payload fields for `harness.edit_proposed` / `harness.edit_accepted` / `harness.edit_rejected`:
+`surface` (which harness component was targeted), `failure_pattern` (the `FailureSignature` that
+motivated the proposal), `delta_in` (held-in pass count change), `delta_ho` (held-out pass count
+change), `rationale` (LLM-generated audit note from `act()`).
+
+---
 
 ### Consumer-defined streams
 
