@@ -31,10 +31,12 @@ from .loops.plan import PlanExecutor, PlanResult, PlanStep
 from .loops.reflexion import ReflexionExecutor
 from .loops.outcome import OutcomeExecutor
 from .loops.utility import UtilityExecutor, UtilityResult, UtilityCandidate
+from .loops.skillopt import SkillOptExecutor, SkillEdit, SkillOptResult
 from .adapters.base import PollingAdapter
 from .adapters.clickup import ClickUpAdapter, ClickUpEventType
 from .adapters.slack import SlackAdapter, SlackEventType
 from .adapters.git import LocalGitAdapter, GitEventType
+from .testing import AgentTestHarness, TestTask, TestResult, TestSuiteResult, AsyncLLMCallable
 
 __all__ = [
     # Bus
@@ -83,6 +85,10 @@ __all__ = [
     "UtilityExecutor",
     "UtilityResult",
     "UtilityCandidate",
+    # Executors — SkillOpt
+    "SkillOptExecutor",
+    "SkillEdit",
+    "SkillOptResult",
     # Adapters
     "PollingAdapter",
     "ClickUpAdapter",
@@ -91,4 +97,10 @@ __all__ = [
     "SlackEventType",
     "LocalGitAdapter",
     "GitEventType",
+    # Testing
+    "AgentTestHarness",
+    "TestTask",
+    "TestResult",
+    "TestSuiteResult",
+    "AsyncLLMCallable",
 ]

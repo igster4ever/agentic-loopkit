@@ -461,7 +461,7 @@ Note: governance events land on `events-governance.jsonl` alongside all other st
 # Note: system Python is blocked by PEP 668 on macOS — always use .venv/bin/python
 ```
 
-431 tests, all passing (as of 2026-06-09). Coverage: EventBus, EventRouter, EventStore,
+478 tests, all passing (as of 2026-06-11). Coverage: EventBus, EventRouter, EventStore,
 AgentBase (all OODA short-circuit paths, AgentState defaults + world_model field, save_state/load_state with and without memory store, semantic/world_model tag separation, roundtrip), RALFExecutor (confidence rejection, learn, follow-up,
 _post_act_hook extension), ReActExecutor (happy path, max_steps, error handling, on_step hook,
 follow-up), PlanExecutor (all-complete, partial, failed, plan() raises, step exception recovery,
@@ -491,7 +491,9 @@ module boundaries (govkit→loopkit one-way, loopkit→govkit zero, governance s
 PerformanceMeasure (mean_confidence, event_count, governance_flags, trend improving/stable/degrading/insufficient_data, follow_up_rate=None baseline, agent filtering, empty list handling),
 ProblemGeneratorAgent (observe gate, min_priority filter, decide None on empty, act emits agenda.item_added, _meta phase/loop_type, causation/correlation, should_explore override, context_streams defaults),
 UtilityExecutor (winner selection, sorted descending, below_threshold, no_candidates, error, follow_up on complete only, isolation contract, criteria_scores, retrieve default, min_utility boundary),
-GovernanceLearningAgent (window accumulation, window trigger, self-exclusion, policy_recommendation/applied exclusion, bus_started trigger, orient calls analyse, confidence filtering, act payload/TrustLevel.HIGH/_meta, window clear, evidence_event_ids, module boundary import check).
+GovernanceLearningAgent (window accumulation, window trigger, self-exclusion, policy_recommendation/applied exclusion, bus_started trigger, orient calls analyse, confidence filtering, act payload/TrustLevel.HIGH/_meta, window clear, evidence_event_ids, module boundary import check),
+AgentTestHarness (TestSuiteResult properties, regression_gate accept/reject paths, run_suite pass/fail/silent/held_out, isolation + no state bleed, majority vote, emitted_events collection, evaluate_result override, AsyncLLMCallable protocol + stub injection),
+SkillOptExecutor (_apply_edits all ops, _is_protected block detection, accepted/rejected edit paths, buffer negative feedback, edit_budget clip, protected proposals stripped, max_iterations cap, learn() hook, slow_update/meta noop defaults + override, retrieve/score/best_skill).
 
 ## Dashboard
 

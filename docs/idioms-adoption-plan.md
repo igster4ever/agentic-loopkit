@@ -27,10 +27,11 @@ The OODA+ReAct composition pattern is documented as the canonical wiring example
 | UtilityExecutor (generate-and-rank) | **Build** | `loops/utility.py` | v4-6 | ✅ Built 2026-06-09 |
 | `world_model` bucket in `AgentState` + `PerformanceMeasure` | **Build** | `agents/base.py`, `agents/performance.py` | v4-7 | ✅ Built 2026-06-08 |
 | GovernanceLearningAgent | **Build** | `agentic_govkit/agents/learning.py` | v4-8 | ✅ Built 2026-06-09 |
-| `AgentTestHarness` + `AsyncLLMCallable` + `TestTask`/`TestSuiteResult` | **Build** | `agentic_loopkit/testing.py` | v4-4 | ⬜ Pending |
+| `AgentTestHarness` + `AsyncLLMCallable` + `TestTask`/`TestSuiteResult` | **Build** | `agentic_loopkit/testing.py` | v4-4 | ✅ Built 2026-06-11 |
 | `FailurePatternAgent` + `FailureSignature` | **Build** | `agents/failure_pattern.py` | v5-1 | ⬜ Pending |
 | `HarnessEventType` + `harness.*` stream | **Build** | `events/models.py` extension | v5-2 | ⬜ Pending |
-| `SelfHarnessExecutor` | **Build** | `loops/self_harness.py` | v5-3 | ⬜ Depends on v4-4 + v5-1 |
+| `SkillOptExecutor` + `SkillEdit` + `RejectedEdit` | **Build** | `loops/skillopt.py` | v5-3 | ⬜ Depends on v5-1 |
+| `SelfHarnessExecutor` | **Build** | `loops/self_harness.py` | v5-4 | ⬜ Depends on v4-4 + v5-1 + v5-3 |
 
 ---
 
@@ -618,6 +619,12 @@ from .loops.utility import UtilityExecutor, UtilityResult, UtilityCandidate
 
 # v4-8 — governance learning (agentic_govkit public API)
 # from agentic_govkit import GovernanceLearningAgent, PolicyRecommendation
+
+# v4-4 — test harness
+from .testing import AgentTestHarness, TestTask, TestResult, TestSuiteResult, AsyncLLMCallable
+
+# v5 — self-improvement primitives
+from .loops.skillopt import SkillOptExecutor, SkillEdit, SkillOptResult
 ```
 
 ---
@@ -651,14 +658,17 @@ from .loops.utility import UtilityExecutor, UtilityResult, UtilityCandidate
 20. ✅ `loops/utility.py` — `UtilityExecutor` + `UtilityResult` + `UtilityCandidate` (2026-06-09)
 21. ✅ `agentic_govkit/agents/learning.py` — `GovernanceLearningAgent` + `PolicyRecommendation` (2026-06-09)
 22. ✅ `agentic_govkit/events/models.py` — `POLICY_RECOMMENDATION` + `POLICY_APPLIED` added to `GovernanceEventType` (2026-06-09)
-23. ⬜ `agentic_loopkit/testing.py` — `AgentTestHarness` + `AsyncLLMCallable` + `TestTask` / `TestResult` / `TestSuiteResult`; `regression_gate()` static method; tests in `tests/test_harness.py` (spec: `docs/agent-testkit-design.md`)
+23. ✅ `agentic_loopkit/testing.py` — `AgentTestHarness` + `AsyncLLMCallable` + `TestTask` / `TestResult` / `TestSuiteResult`; `regression_gate()` static method; tests in `tests/test_harness.py` (spec: `docs/agent-testkit-design.md`) (2026-06-11)
 
 ### v5 — self-improvement primitives
-_Sourced from: arXiv:2606.09498 "Self-Harness: Harnesses That Improve Themselves" (2026-06-10)_
+_Sources:_
+_— arXiv:2606.09498 "Self-Harness: Harnesses That Improve Themselves" (2026-06-10)_
+_— arXiv:2605.23904 "SkillOpt: Executive Strategy for Self-Evolving Agent Skills" (Microsoft / SJTU, 2026-06-11) — spec: `docs/skillopt-executor-design.md`_
 
 24. ⬜ `events/models.py` — `HarnessEventType` StrEnum: `harness.edit_proposed`, `harness.edit_accepted`, `harness.edit_rejected`, `harness.candidate_eval`; update `event-catalog.md`
 25. ⬜ `agents/failure_pattern.py` — `FailurePatternAgent(ProjectionAgent)` + `FailureSignature` dataclass; subscribes to `system.*` + `governance.*`; clusters error events by `(terminal_cause, causal_status, agent_mechanism)`; emits `system.failure_pattern_detected`; tests in `tests/agents/test_failure_pattern.py`
-26. ⬜ `loops/self_harness.py` — `SelfHarnessExecutor(OutcomeExecutor)`: `retrieve()` loads `FailurePatternAgent` outputs; `act()` delegates to `UtilityExecutor` for K candidate proposals; `evaluate()` calls `AgentTestHarness.regression_gate()` (deterministic — no LLM); `follow_up()` emits `harness.edit_accepted` or `harness.edit_rejected`; tests in `tests/loops/test_self_harness.py` (spec: TODO — draft once v4-4 + v5-1 are built)
+26. ⬜ `loops/skillopt.py` — `SkillOptExecutor(RALFExecutor)` + `SkillEdit` + `RejectedEdit` + `SkillOptResult`; bounded validation-gated skill optimiser (arXiv:2605.23904); LLM in `reflect()` only (optimizer model, not task agent); `score()` deterministic — no LLM; `edit_budget = 4` (L_t analogue); `_step_buffer: list[RejectedEdit]` = rejected-edit negative feedback passed to subsequent `reflect()` calls; `slow_update()` + `update_meta_skill()` optional hooks (default no-op); `_apply_edits()` internal helper (append/insert_after/replace/delete); `max_iterations = 4` epochs; `best_skill` property exports the deployed artifact; spec: `docs/skillopt-executor-design.md`; tests in `tests/loops/test_skillopt.py`
+27. ⬜ `loops/self_harness.py` — `SelfHarnessExecutor(OutcomeExecutor)`: integration executor wiring the v5 primitives end-to-end; `retrieve()` loads `FailurePatternAgent` outputs from EventStore (train/selection trajectory splits); `act(context, prior_result)` runs `SkillOptExecutor` for configured epochs — returns `SkillOptResult` as the artifact; `evaluate(artifact, rubric)` instantiates `AgentTestHarness` on candidate vs baseline skill and calls `regression_gate()` (deterministic — no LLM; `satisfied = regression_gate(baseline, candidate)`); rubric property = `"candidate skill must pass regression_gate() against baseline"`; `follow_up()` emits `harness.edit_accepted` (with `best_skill` payload) or `harness.edit_rejected`; `max_iterations = 3` (OutcomeExecutor default); tests in `tests/loops/test_self_harness.py`
 
 ---
 
