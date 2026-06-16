@@ -352,8 +352,8 @@ RALF variants extend `RALFExecutor` via `_post_act_hook()` — never by copying 
 | `UtilityExecutor` | `loops/utility.py` | Standalone generate-and-rank; LLM in `generate_candidates()` + `utility_score()` | ✅ Built (2026-06-09) |
 | `AgentTestHarness` | `testing.py` | Run agent against `TestTask` list; `regression_gate()` — non-regressive acceptance rule; `AsyncLLMCallable` protocol for stub injection | ✅ Built (2026-06-11) |
 | `SkillOptExecutor` | `loops/skillopt.py` | RALF-based bounded skill optimiser (arXiv:2605.23904); LLM in `reflect()` only; `score()` deterministic; validation gate + rejected-edit buffer + `slow_update()` hook; `edit_budget` cap | ✅ Built (2026-06-11) |
-| `FailurePatternAgent` | `agents/failure_pattern.py` | `ProjectionAgent` subclass; clusters error events by `FailureSignature`; emits `system.failure_pattern_detected` | ⬜ v5-2 |
-| `SelfHarnessExecutor` | `loops/self_harness.py` | `OutcomeExecutor` subclass; wires FailurePatternAgent → SkillOptExecutor → `AgentTestHarness.regression_gate()` → emit harness.edit_accepted/rejected | ⬜ v5-4 (needs v4-4 + v5-1 + v5-3) |
+| `FailurePatternAgent` | `agents/failure_pattern.py` | `ProjectionAgent` subclass; clusters error events by `FailureSignature(terminal_cause, causal_status, agent_mechanism)`; emits `system.failure_pattern_detected` | ✅ Built (2026-06-16) |
+| `SelfHarnessExecutor` | `loops/self_harness.py` | `OutcomeExecutor` subclass; wires `FailurePatternAgent` → `SkillOptExecutor` → `AgentTestHarness.regression_gate()` → emit `harness.edit_accepted/rejected`; evaluate() is deterministic — no LLM | ✅ Built (2026-06-16) |
 
 ### EventMeta convention (see `CLAUDE.md`)
 

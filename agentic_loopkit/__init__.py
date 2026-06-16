@@ -17,7 +17,7 @@ Quick start:
 """
 
 from .bus import EventBus
-from .events.models import Event, EventMeta, SystemEventType, TrustLevel, WILDCARD_STREAM
+from .events.models import Event, EventMeta, SystemEventType, HarnessEventType, TrustLevel, WILDCARD_STREAM
 from .events.router import EventRouter, Subscriber
 from .events.store import append_event, load_events
 from .events.confidence import aggregate_confidence
@@ -25,6 +25,7 @@ from .agents.base import AgentBase, AgentState
 from .agents.projection import ProjectionAgent, ProjectionEventType
 from .agents.performance import PerformanceMeasure, PerformanceScore, SimpleConfidencePerformance
 from .agents.problem_generator import ProblemGeneratorAgent, AgendaEventType, AgendaItem
+from .agents.failure_pattern import FailurePatternAgent, FailureSignature
 from .loops.ralf import RALFExecutor, RALFResult, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, CONFIDENCE_HIGH
 from .loops.react import ReActExecutor, ReActResult, ReActStep
 from .loops.plan import PlanExecutor, PlanResult, PlanStep
@@ -32,6 +33,7 @@ from .loops.reflexion import ReflexionExecutor
 from .loops.outcome import OutcomeExecutor
 from .loops.utility import UtilityExecutor, UtilityResult, UtilityCandidate
 from .loops.skillopt import SkillOptExecutor, SkillEdit, SkillOptResult
+from .loops.self_harness import SelfHarnessExecutor
 from .adapters.base import PollingAdapter
 from .adapters.clickup import ClickUpAdapter, ClickUpEventType
 from .adapters.slack import SlackAdapter, SlackEventType
@@ -45,6 +47,7 @@ __all__ = [
     "Event",
     "EventMeta",
     "SystemEventType",
+    "HarnessEventType",
     "TrustLevel",
     "WILDCARD_STREAM",
     "EventRouter",
@@ -63,6 +66,8 @@ __all__ = [
     "ProblemGeneratorAgent",
     "AgendaEventType",
     "AgendaItem",
+    "FailurePatternAgent",
+    "FailureSignature",
     # Executors — RALF
     "RALFExecutor",
     "RALFResult",
@@ -89,6 +94,8 @@ __all__ = [
     "SkillOptExecutor",
     "SkillEdit",
     "SkillOptResult",
+    # Executors — SelfHarness
+    "SelfHarnessExecutor",
     # Adapters
     "PollingAdapter",
     "ClickUpAdapter",

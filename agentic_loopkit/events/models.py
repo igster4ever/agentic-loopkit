@@ -30,14 +30,23 @@ from ..utils.time import iso_format
 
 class SystemEventType(StrEnum):
     """Built-in loopkit system events.  Stream: 'system'."""
-    BUS_STARTED     = "system.bus_started"
-    BUS_STOPPED     = "system.bus_stopped"
-    BUS_PRESSURE    = "system.bus_pressure"
-    AGENT_STARTED   = "system.agent_started"
-    AGENT_STOPPED   = "system.agent_stopped"
-    ADAPTER_ERROR   = "system.adapter_error"
-    ADAPTER_ALIVE   = "system.adapter_alive"
-    ADAPTER_STALLED = "system.adapter_stalled"
+    BUS_STARTED              = "system.bus_started"
+    BUS_STOPPED              = "system.bus_stopped"
+    BUS_PRESSURE             = "system.bus_pressure"
+    AGENT_STARTED            = "system.agent_started"
+    AGENT_STOPPED            = "system.agent_stopped"
+    ADAPTER_ERROR            = "system.adapter_error"
+    ADAPTER_ALIVE            = "system.adapter_alive"
+    ADAPTER_STALLED          = "system.adapter_stalled"
+    FAILURE_PATTERN_DETECTED = "system.failure_pattern_detected"
+
+
+class HarnessEventType(StrEnum):
+    """Test-harness lifecycle events emitted by SelfHarnessExecutor.  Stream: 'harness'."""
+    EDIT_PROPOSED  = "harness.edit_proposed"
+    EDIT_ACCEPTED  = "harness.edit_accepted"
+    EDIT_REJECTED  = "harness.edit_rejected"
+    CANDIDATE_EVAL = "harness.candidate_eval"
 
 
 class TrustLevel(StrEnum):
@@ -88,7 +97,7 @@ class EventMeta:
     """
 
     phase:      Optional[str]   = None  # "observe"|"orient"|"decide"|"act"|"think"|"execute"|"retrieve"|"learn"
-    loop_type:  Optional[str]   = None  # "ooda"|"ralf"|"react"|"plan"|"reflexion"|"outcome"|"conflict"
+    loop_type:  Optional[str]   = None  # "ooda"|"ralf"|"react"|"plan"|"reflexion"|"outcome"|"conflict"|"skillopt"|"self_harness"
     iteration:  Optional[int]   = None  # step/iteration number within the loop
     confidence: Optional[float] = None  # 0.0–1.0
     context:    Optional[str]   = None  # human-readable reasoning for dashboard Context tab
