@@ -19,6 +19,7 @@ agentic_loopkit/
 │   ├── models.py            # Event + EventMeta dataclasses + SystemEventType(StrEnum)
 │   ├── router.py            # Async callback fanout (Subscriber = Callable[[Event], Awaitable[None]])
 │   ├── store.py             # JSONL per-stream persistence (~/.cache/<app>/events-<stream>.jsonl)
+│   ├── headlines.py         # EventHeadline + append_headline + load_headlines + expand_event (LCLM-inspired)
 │   └── confidence.py        # aggregate_confidence() — TrustLevel-weighted, depth-decayed mean
 │
 ├── agents/
@@ -74,14 +75,15 @@ agentic_loopkit/dashboard/           # Optional FastAPI management API (pip inst
     └── adapters.py          # GET /api/adapters
 
 agentic_govkit/                  # Governance layer (pip install agentic-loopkit[governance])
-├── __init__.py              # exports AuditAgent, KillSwitchAgent, GovernanceEventType, ConflictResolutionExecutor
+├── __init__.py              # exports AuditAgent, KillSwitchAgent, GovernanceEventType, ConflictResolutionExecutor, CouncilExecutor, CouncilOpinion
 ├── agents/
 │   ├── audit.py             # AuditAgent — OODA wildcard observer; emits governance.* events
 │   └── killswitch.py        # KillSwitchAgent — policy enforcement; emits halt/quarantine/human_override
 ├── loops/
-│   └── conflict.py          # ConflictResolutionExecutor — OutcomeExecutor subclass; dispute mediation
+│   ├── conflict.py          # ConflictResolutionExecutor — OutcomeExecutor subclass; dispute mediation
+│   └── council.py           # CouncilExecutor + CouncilOpinion — fan-out to N specialists → weighted consensus → governance.council_decision
 └── events/
-    └── models.py            # GovernanceEventType StrEnum (governance.* stream)
+    └── models.py            # GovernanceEventType StrEnum (governance.* stream) incl. COUNCIL_DECISION
 
 docs/
 ├── architecture.md          # Logical architecture, component roles, data flow (ASCII diagrams)
@@ -281,6 +283,8 @@ from agentic_loopkit import (
     Event, EventMeta, SystemEventType, TrustLevel, WILDCARD_STREAM,
     EventRouter, Subscriber,
     append_event, load_events,
+    # Headlines (LCLM-inspired corpus skimming)
+    EventHeadline, append_headline, load_headlines, expand_event,
     # Agents
     AgentBase, AgentState,
     ProjectionAgent, ProjectionEventType,
@@ -461,7 +465,7 @@ Note: governance events land on `events-governance.jsonl` alongside all other st
 # Note: system Python is blocked by PEP 668 on macOS — always use .venv/bin/python
 ```
 
-478 tests, all passing (as of 2026-06-11). Coverage: EventBus, EventRouter, EventStore,
+556 tests, all passing (as of 2026-06-18). Coverage: EventBus, EventRouter, EventStore,
 AgentBase (all OODA short-circuit paths, AgentState defaults + world_model field, save_state/load_state with and without memory store, semantic/world_model tag separation, roundtrip), RALFExecutor (confidence rejection, learn, follow-up,
 _post_act_hook extension), ReActExecutor (happy path, max_steps, error handling, on_step hook,
 follow-up), PlanExecutor (all-complete, partial, failed, plan() raises, step exception recovery,
@@ -493,7 +497,11 @@ ProblemGeneratorAgent (observe gate, min_priority filter, decide None on empty, 
 UtilityExecutor (winner selection, sorted descending, below_threshold, no_candidates, error, follow_up on complete only, isolation contract, criteria_scores, retrieve default, min_utility boundary),
 GovernanceLearningAgent (window accumulation, window trigger, self-exclusion, policy_recommendation/applied exclusion, bus_started trigger, orient calls analyse, confidence filtering, act payload/TrustLevel.HIGH/_meta, window clear, evidence_event_ids, module boundary import check),
 AgentTestHarness (TestSuiteResult properties, regression_gate accept/reject paths, run_suite pass/fail/silent/held_out, isolation + no state bleed, majority vote, emitted_events collection, evaluate_result override, AsyncLLMCallable protocol + stub injection),
-SkillOptExecutor (_apply_edits all ops, _is_protected block detection, accepted/rejected edit paths, buffer negative feedback, edit_budget clip, protected proposals stripped, max_iterations cap, learn() hook, slow_update/meta noop defaults + override, retrieve/score/best_skill).
+SkillOptExecutor (_apply_edits all ops, _is_protected block detection, accepted/rejected edit paths, buffer negative feedback, edit_budget clip, protected proposals stripped, max_iterations cap, learn() hook, slow_update/meta noop defaults + override, retrieve/score/best_skill),
+FailurePatternAgent (observe gate, stream filter system+governance, FailureSignature clustering by terminal_cause/causal_status/agent_mechanism, materialise() → system.failure_pattern_detected, should_materialise override),
+SelfHarnessExecutor (retrieve loads failure_pattern_detected events, act() instantiates SkillOptExecutor via factory, evaluate() calls regression_gate() deterministically, follow_up emits harness.edit_accepted/rejected, max_iterations=3),
+CouncilExecutor (council_decision on complete, human_override on exhaustion/confidence rejection, evaluate isolation contract, opinions+question via context, gather_opinions wired via retrieve, causation chain, CouncilOpinion defaults + custom weight, default max_iterations=3, module boundary import check),
+EventHeadline (to_dict/from_dict round-trip, from_event: summary field + fallback + confidence suffix + truncation to 120, append_headline chunk_id sequential per stream, load_headlines newest-first + limit, expand_event correct event + None for unknown, compact_stream compatibility, stream isolation, EventBus publish writes headline + load_headlines + expand_event delegates).
 
 ## Dashboard
 
@@ -555,9 +563,10 @@ Flags raised as events on the `governance` stream:
 - `governance.confidence_breach` — `_meta.confidence < confidence_threshold` (opt-in; disabled if threshold=None)
 - `governance.dispute_opened` — emitted by ConflictResolutionExecutor when mediation begins
 - `governance.dispute_resolved` — emitted by ConflictResolutionExecutor on consensus (status=complete)
-- `governance.human_override` — emitted by ConflictResolutionExecutor (exhaustion/error) or KillSwitchAgent
+- `governance.human_override` — emitted by ConflictResolutionExecutor (exhaustion/error) or KillSwitchAgent or CouncilExecutor
 - `governance.halt` — emitted by KillSwitchAgent; correlation chain halted by policy
 - `governance.quarantine` — emitted by KillSwitchAgent; source quarantined by policy
+- `governance.council_decision` — emitted by CouncilExecutor; N-specialist weighted consensus reached
 
 ### KillSwitchAgent
 
@@ -584,6 +593,38 @@ positions. Emits `governance.dispute_resolved` on consensus (`status="complete"`
 `governance.human_override` on exhaustion/error. Inherits `max_iterations=3` default.
 The `confidence=0.5` path in `OutcomeExecutor._post_act_hook` means `status="rejected"` is
 structurally unreachable — exhaustion exits as `status="error"`, triggering `human_override`.
+
+### CouncilExecutor
+
+`OutcomeExecutor` subclass in `agentic_govkit/loops/council.py`. Fan-out governance executor:
+submits a question to N specialist agents via `gather_opinions()`, synthesises weighted consensus
+in `act()`, gate-checks with isolated `evaluate()`. Emits `governance.council_decision` on
+consensus or `governance.human_override` on exhaustion/error.
+
+Distinct from `ConflictResolutionExecutor` (two-party mediation) and `UtilityExecutor`
+(single-agent generate-and-rank). `CouncilOpinion(source, opinion, weight=1.0, confidence=1.0)`
+carries each specialist's contribution.
+
+```python
+from agentic_govkit import CouncilExecutor, CouncilOpinion
+
+class TechCouncil(CouncilExecutor):
+    @property
+    def rubric(self):
+        return "## Rubric\n- Decision is actionable\n- References at least two opinions\n"
+
+    async def gather_opinions(self, event):
+        return [
+            CouncilOpinion("security", await ask_security(event), weight=1.5),
+            CouncilOpinion("perf",     await ask_perf(event)),
+        ]
+
+    async def act(self, context, prior):
+        ...  # LLM synthesises context["opinions"]
+
+    async def evaluate(self, artifact, rubric):
+        ...  # isolated LLM check — no prior history
+```
 
 ### TrustLevel
 

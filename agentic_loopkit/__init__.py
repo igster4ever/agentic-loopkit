@@ -20,6 +20,7 @@ from .bus import EventBus
 from .events.models import Event, EventMeta, SystemEventType, HarnessEventType, TrustLevel, WILDCARD_STREAM
 from .events.router import EventRouter, Subscriber
 from .events.store import append_event, load_events
+from .events.headlines import EventHeadline, append_headline, load_headlines, expand_event
 from .events.confidence import aggregate_confidence
 from .agents.base import AgentBase, AgentState
 from .agents.projection import ProjectionAgent, ProjectionEventType
@@ -54,6 +55,10 @@ __all__ = [
     "Subscriber",
     "append_event",
     "load_events",
+    "EventHeadline",
+    "append_headline",
+    "load_headlines",
+    "expand_event",
     "aggregate_confidence",
     # Agents
     "AgentBase",

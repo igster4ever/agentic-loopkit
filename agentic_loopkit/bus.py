@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING, Optional
 from .events.models import Event, SystemEventType
 from .events.router import EventRouter
 from .events.store import append_event
+from .events.headlines import EventHeadline, append_headline, load_headlines, expand_event
 
 if TYPE_CHECKING:
     from .agents.base import AgentBase
@@ -96,6 +97,7 @@ class EventBus:
         from the count so the pressure signal cannot trigger itself.
         """
         append_event(event, store_dir=self.store_dir)
+        append_headline(event, store_dir=self.store_dir)
         await self.router.publish(event)
         if event.stream != "system":
             self._event_counter += 1
@@ -166,6 +168,16 @@ class EventBus:
     def adapters(self) -> list["PollingAdapter"]:
         """Registered adapters (read-only snapshot)."""
         return list(self._adapters)
+
+    # ── Headline access (LCLM-inspired corpus skimming) ──────────────────────
+
+    def load_headlines(self, stream: str, limit: int = 50) -> list[EventHeadline]:
+        """Return the most recent ``limit`` headlines for the stream, newest first."""
+        return load_headlines(stream, store_dir=self.store_dir, limit=limit)
+
+    def expand_event(self, chunk_id: int, stream: str) -> "Event | None":
+        """Resolve a chunk_id to the full ``Event``.  Returns None if not found."""
+        return expand_event(chunk_id, stream, store_dir=self.store_dir)
 
     # ── Tick registration (called by PollingAdapter) ──────────────────────────
 

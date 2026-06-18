@@ -150,8 +150,9 @@ Reactive pattern. Runs on every subscribed event.
 
 LLM placement rule: **orient() only** in AgentBase. observe, decide, act are deterministic.
 In executor composition: LLM also lives in `think()` (ReActExecutor), `plan()` (PlanExecutor),
-`critique()` (ReflexionExecutor), and `evaluate()` (OutcomeExecutor) — never in `execute()`,
-`execute_step()`, or `retrieve()`.
+`critique()` (ReflexionExecutor), `evaluate()` (OutcomeExecutor), and `reflect()` (SkillOptExecutor)
+— never in `execute()`, `execute_step()`, `retrieve()`, or `score()`.
+Note: `SelfHarnessExecutor.evaluate()` is deterministic (calls `regression_gate()`, no LLM).
 
 ---
 

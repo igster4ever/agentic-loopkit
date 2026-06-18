@@ -99,6 +99,7 @@ All `governance.*` events are persisted and inspectable — the auditor is audit
 | `governance.quarantine` | `KillSwitchAgent` | source quarantined by policy | policy router, alerting |
 | `governance.policy_recommendation` | `GovernanceLearningAgent` | analysis window full or bus started; confidence ≥ `min_confidence` | operators, dashboards, `KillSwitchAgent` policy wiring |
 | `governance.policy_applied` | consumer / operator | policy recommendation accepted and applied | `GovernanceLearningAgent` (self-excluded), audit log |
+| `governance.council_decision` | `CouncilExecutor` | N-specialist weighted consensus reached | downstream agents, audit log, dashboards |
 
 `governance.confidence_breach` payload includes `confidence` (float) and `threshold` (float)
 in addition to the standard `flagged_event_id`, `flagged_event_type`, `flagged_source`, `detail` fields.
@@ -115,6 +116,7 @@ agentic_loopkit  ──publishes──▶  EventBus  ──routes──▶  agen
                                                              AuditAgent       ── observes all (*) ──▶ publishes governance.*
                                                              KillSwitchAgent  ── listens governance.* ──▶ publishes governance.halt/quarantine/human_override
                                                              ConflictResolutionExecutor ── triggered by governance.dispute_opened ──▶ publishes governance.dispute_resolved/human_override
+                                                             CouncilExecutor            ── triggered by any event ──▶ publishes governance.council_decision/human_override
                                                          }
                                                              │
                                               governance.* events routed to all bus subscribers

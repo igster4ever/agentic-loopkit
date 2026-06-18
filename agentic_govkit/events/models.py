@@ -22,3 +22,4 @@ class GovernanceEventType(StrEnum):
     QUARANTINE            = "governance.quarantine"             # source quarantined by KillSwitchAgent
     POLICY_RECOMMENDATION = "governance.policy_recommendation" # GovernanceLearningAgent recommendation
     POLICY_APPLIED        = "governance.policy_applied"        # emitted by consumer when recommendation accepted
+    COUNCIL_DECISION      = "governance.council_decision"      # CouncilExecutor consensus reached

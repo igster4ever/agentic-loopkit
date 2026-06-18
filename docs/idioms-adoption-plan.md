@@ -623,8 +623,14 @@ from .loops.utility import UtilityExecutor, UtilityResult, UtilityCandidate
 # v4-4 — test harness
 from .testing import AgentTestHarness, TestTask, TestResult, TestSuiteResult, AsyncLLMCallable
 
+# v4-7 — performance measurement
+from .agents.performance import PerformanceMeasure, PerformanceScore, SimpleConfidencePerformance
+
 # v5 — self-improvement primitives
+from .events.models import HarnessEventType           # harness.* stream StrEnum
+from .agents.failure_pattern import FailurePatternAgent, FailureSignature
 from .loops.skillopt import SkillOptExecutor, SkillEdit, SkillOptResult
+from .loops.self_harness import SelfHarnessExecutor
 ```
 
 ---

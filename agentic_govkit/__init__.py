@@ -32,6 +32,7 @@ from agentic_govkit.agents.killswitch import KillSwitchAgent
 from agentic_govkit.agents.learning import GovernanceLearningAgent, PolicyRecommendation
 from agentic_govkit.events.models import GovernanceEventType
 from agentic_govkit.loops.conflict import ConflictResolutionExecutor
+from agentic_govkit.loops.council import CouncilExecutor, CouncilOpinion
 
 __all__ = [
     "AuditAgent",
@@ -40,4 +41,6 @@ __all__ = [
     "PolicyRecommendation",
     "GovernanceEventType",
     "ConflictResolutionExecutor",
+    "CouncilExecutor",
+    "CouncilOpinion",
 ]
