@@ -28,6 +28,8 @@ The OODA+ReAct composition pattern is documented as the canonical wiring example
 | `world_model` bucket in `AgentState` + `PerformanceMeasure` | **Build** | `agents/base.py`, `agents/performance.py` | v4-7 | ✅ Built 2026-06-08 |
 | GovernanceLearningAgent | **Build** | `agentic_govkit/agents/learning.py` | v4-8 | ✅ Built 2026-06-09 |
 | `AgentTestHarness` + `AsyncLLMCallable` + `TestTask`/`TestSuiteResult` | **Build** | `agentic_loopkit/testing.py` | v4-4 | ✅ Built 2026-06-11 |
+| `CouncilExecutor` (fan-out N specialists → weighted consensus) | **Build** | `agentic_govkit/loops/council.py` | v6-1 | ✅ Built 2026-06-18 |
+| `EventHeadline` / LCLM headline storage (arXiv:2606.09659) | **Build** | `events/headlines.py` | v6-2 | ✅ Built 2026-06-18 |
 | `FailurePatternAgent` + `FailureSignature` | **Build** | `agents/failure_pattern.py` | v5-1 | ✅ Built 2026-06-16 |
 | `HarnessEventType` + `harness.*` stream | **Build** | `events/models.py` extension | v5-2 | ✅ Built 2026-06-16 |
 | `SkillOptExecutor` + `SkillEdit` + `RejectedEdit` | **Build** | `loops/skillopt.py` | v5-3 | ✅ Built 2026-06-11 |
@@ -631,6 +633,10 @@ from .events.models import HarnessEventType           # harness.* stream StrEnum
 from .agents.failure_pattern import FailurePatternAgent, FailureSignature
 from .loops.skillopt import SkillOptExecutor, SkillEdit, SkillOptResult
 from .loops.self_harness import SelfHarnessExecutor
+
+# v6 — multi-agent coordination + LCLM headline storage
+from .events.headlines import EventHeadline, append_headline, load_headlines, expand_event
+# from agentic_govkit import CouncilExecutor, CouncilOpinion
 ```
 
 ---
@@ -675,6 +681,14 @@ _— arXiv:2605.23904 "SkillOpt: Executive Strategy for Self-Evolving Agent Skil
 25. ✅ `agents/failure_pattern.py` — `FailurePatternAgent(ProjectionAgent)` + `FailureSignature` dataclass; subscribes to `system.*` + `governance.*`; clusters error events by `(terminal_cause, causal_status, agent_mechanism)`; emits `system.failure_pattern_detected`; 16 tests in `tests/agents/test_failure_pattern.py` (2026-06-16)
 26. ✅ `loops/skillopt.py` — `SkillOptExecutor(RALFExecutor)` + `SkillEdit` + `RejectedEdit` + `SkillOptResult`; bounded validation-gated skill optimiser (arXiv:2605.23904); LLM in `reflect()` only (optimizer model, not task agent); `score()` deterministic — no LLM; `edit_budget = 4` (L_t analogue); `_step_buffer: list[RejectedEdit]` = rejected-edit negative feedback passed to subsequent `reflect()` calls; `slow_update()` + `update_meta_skill()` optional hooks (default no-op); `_apply_edits()` internal helper (append/insert_after/replace/delete); `max_iterations = 4` epochs; `best_skill` property exports the deployed artifact; spec: `docs/skillopt-executor-design.md`; tests in `tests/loops/test_skillopt.py` (2026-06-11)
 27. ✅ `loops/self_harness.py` — `SelfHarnessExecutor(OutcomeExecutor)`: integration executor wiring the v5 primitives end-to-end; `retrieve()` loads `system.failure_pattern_detected` events from EventStore (train/selection trajectory splits); `act(context, prior_result)` instantiates fresh `SkillOptExecutor` via factory, runs to completion, returns `SkillOptResult`; `evaluate(artifact, rubric)` calls `AgentTestHarness.regression_gate()` (deterministic — no LLM); rubric = `"candidate skill must pass regression_gate() against baseline"`; `follow_up()` emits `harness.edit_accepted` (with `best_skill` payload) or `harness.edit_rejected`; `max_iterations = 3`; 14 tests in `tests/loops/test_self_harness.py` (2026-06-16)
+
+### v6 — multi-agent coordination + LCLM headline storage
+_Sources:_
+_— arXiv:2606.09659 "LCLM: Long-Context Language Models" (headline compression, 2026-06-18)_
+
+28. ✅ `agentic_govkit/loops/council.py` — `CouncilExecutor(OutcomeExecutor)`: fan-out governance executor; submits question to N specialist agents in parallel; gathers `CouncilOpinion` responses; isolated `evaluate()` for consensus quality gate; emits `governance.council_decision` on consensus or `governance.human_override` on failure; `CouncilOpinion` dataclass (agent_name, opinion, confidence, reasoning); tests in `tests/govkit/test_council.py` (2026-06-18)
+29. ✅ `GovernanceEventType.COUNCIL_DECISION` added to `agentic_govkit/events/models.py` + event-catalog.md updated (2026-06-18)
+30. ✅ `events/headlines.py` — `EventHeadline` dataclass (event_id, stream, event_type, timestamp, headline ≤ 120 chars, chunk_id); `append_headline(store_dir, stream, event, headline)` writer; `load_headlines(store_dir, stream, limit)` reader; `expand_event(store_dir, stream, chunk_id)` O(1) lookup; stored in `headlines-<stream>.jsonl`; `EventBus.publish()` auto-writes headline; `compact_stream()` compatible; `EventBus.load_headlines()` + `EventBus.expand_event()` delegates added; exported from `agentic_loopkit.__init__`; tests in `tests/events/test_headlines.py` (2026-06-18)
 
 ---
 

@@ -355,6 +355,7 @@ RALF variants extend `RALFExecutor` via `_post_act_hook()` — never by copying 
 | `SkillOptExecutor` | `loops/skillopt.py` | RALF-based bounded skill optimiser (arXiv:2605.23904); LLM in `reflect()` only; `score()` deterministic; validation gate + rejected-edit buffer + `slow_update()` hook; `edit_budget` cap | ✅ Built (2026-06-11) |
 | `FailurePatternAgent` | `agents/failure_pattern.py` | `ProjectionAgent` subclass; clusters error events by `FailureSignature(terminal_cause, causal_status, agent_mechanism)`; emits `system.failure_pattern_detected` | ✅ Built (2026-06-16) |
 | `SelfHarnessExecutor` | `loops/self_harness.py` | `OutcomeExecutor` subclass; wires `FailurePatternAgent` → `SkillOptExecutor` → `AgentTestHarness.regression_gate()` → emit `harness.edit_accepted/rejected`; evaluate() is deterministic — no LLM | ✅ Built (2026-06-16) |
+| `CouncilExecutor` | `agentic_govkit/loops/council.py` | `OutcomeExecutor` subclass (govkit); submits question to N specialist agents in parallel; isolated `evaluate()` for consensus quality gate; emits `governance.council_decision` on consensus or `governance.human_override` on failure | ✅ Built (2026-06-18) |
 
 ### EventMeta convention (see `CLAUDE.md`)
 
@@ -362,6 +363,29 @@ RALF variants extend `RALFExecutor` via `_post_act_hook()` — never by copying 
 write structured framework metadata (phase, loop_type, confidence, context text) into
 `payload["_meta"]`. Consumer payload keys are never modified.
 Read back via `event.meta()` — returns the dict or `None` if absent.
+
+### EventHeadline / LCLM storage compression (see `events/headlines.py`)
+
+LCLM-inspired (arXiv:2606.09659 §7) headline layer for the event log. Each event gets a
+compact one-line summary written to a parallel `headlines-<stream>.jsonl` file at publish time.
+Agents can skim the full corpus in a single cheap pass, then expand only the events they need.
+
+```python
+from agentic_loopkit import load_headlines, expand_event
+
+# Skim the last 500 headlines — low token cost
+headlines = load_headlines(bus.store_dir, stream="harness", limit=500)
+# → list[EventHeadline(event_id, stream, event_type, timestamp, headline, chunk_id)]
+
+# Expand one event by chunk_id — O(1) lookup
+event = expand_event(bus.store_dir, stream="harness", chunk_id=headlines[0].chunk_id)
+```
+
+`EventBus.publish()` auto-writes the headline — no extra call needed. Stored at
+`<store_dir>/headlines-<stream>.jsonl`. Compatible with `compact_stream()`.
+
+**Built 2026-06-18.** Exported from `agentic_loopkit`: `EventHeadline`, `append_headline`,
+`load_headlines`, `expand_event`.
 
 ### Additional adapters
 
