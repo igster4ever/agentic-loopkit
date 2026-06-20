@@ -39,6 +39,7 @@ from .adapters.base import PollingAdapter
 from .adapters.clickup import ClickUpAdapter, ClickUpEventType
 from .adapters.slack import SlackAdapter, SlackEventType
 from .adapters.git import LocalGitAdapter, GitEventType
+from .adapters.community import CommunityFeedAdapter, CommunityEventType
 from .testing import AgentTestHarness, TestTask, TestResult, TestSuiteResult, AsyncLLMCallable
 
 __all__ = [
@@ -109,6 +110,8 @@ __all__ = [
     "SlackEventType",
     "LocalGitAdapter",
     "GitEventType",
+    "CommunityFeedAdapter",
+    "CommunityEventType",
     # Testing
     "AgentTestHarness",
     "TestTask",

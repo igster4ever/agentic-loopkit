@@ -40,7 +40,8 @@ agentic_loopkit/
     ├── base.py              # PollingAdapter — tick-driven external source bridge
     ├── clickup.py           # ClickUpAdapter + ClickUpEventType — polls ClickUp REST API
     ├── slack.py             # SlackAdapter + SlackEventType — polls conversations.history
-    └── git.py               # LocalGitAdapter + GitEventType — polls local git repo via subprocess
+    ├── git.py               # LocalGitAdapter + GitEventType — polls local git repo via subprocess
+    └── community.py         # CommunityFeedAdapter + CommunityEventType — JSONL feed; byte-offset cursor; trust_level param
 
 dashboard/
 └── ui/                           # Bun + Vite + React 19 + TypeScript (built 2026-05-11)
@@ -75,10 +76,12 @@ agentic_loopkit/dashboard/           # Optional FastAPI management API (pip inst
     └── adapters.py          # GET /api/adapters
 
 agentic_govkit/                  # Governance layer (pip install agentic-loopkit[governance])
-├── __init__.py              # exports AuditAgent, KillSwitchAgent, GovernanceEventType, ConflictResolutionExecutor, CouncilExecutor, CouncilOpinion
+├── __init__.py              # exports AuditAgent, KillSwitchAgent, GovernanceEventType, ConflictResolutionExecutor, CouncilExecutor, CouncilOpinion, CommunityTrustLearner
 ├── agents/
 │   ├── audit.py             # AuditAgent — OODA wildcard observer; emits governance.* events
-│   └── killswitch.py        # KillSwitchAgent — policy enforcement; emits halt/quarantine/human_override
+│   ├── killswitch.py        # KillSwitchAgent — policy enforcement; emits halt/quarantine/human_override
+│   ├── learning.py          # GovernanceLearningAgent + PolicyRecommendation — rolling window → analyse() → policy_recommendation
+│   └── community_trust.py   # CommunityTrustLearner — concrete GovernanceLearningAgent; UNTRUSTED→LOW trust graduation
 ├── loops/
 │   ├── conflict.py          # ConflictResolutionExecutor — OutcomeExecutor subclass; dispute mediation
 │   └── council.py           # CouncilExecutor + CouncilOpinion — fan-out to N specialists → weighted consensus → governance.council_decision
@@ -92,15 +95,16 @@ docs/
 ├── dashboard-stack.md       # Logical layer diagram: browser / FastAPI / loopkit runtime / JSONL
 ├── event-catalog.md         # All event types by module; module communication contract; trust levels
 ├── mem0-appraisal.md        # Mem0 architecture appraisal; build-bespoke recommendation for v4 memory
-└── memorykit-design.md      # agentic_memorykit v0.1 design brief (interface, storage, reconciliation)
+├── memorykit-design.md      # agentic_memorykit v0.1 design brief (interface, storage, reconciliation)
+└── community-feed-trust-pathway.md  # Trust graduation guide: CommunityFeedAdapter + AuditAgent + CommunityTrustLearner wiring
 
 tests/
 ├── events/                  # test_models (incl. EventMeta, TrustLevel, delegation_depth), test_router, test_store
 ├── agents/                  # test_base (OODA pipeline)
 ├── loops/                   # test_ralf, test_react, test_plan, test_reflexion, test_outcome
-├── adapters/                # test_base (PollingAdapter), test_clickup, test_slack, test_git
+├── adapters/                # test_base (PollingAdapter), test_clickup, test_slack, test_git, test_community
 ├── dashboard/               # test_routes_streams, test_routes_events, test_routes_chains, test_routes_agents_adapters
-└── govkit/                  # test_module_boundaries, test_audit_agent, test_killswitch, test_conflict_resolution
+└── govkit/                  # test_module_boundaries, test_audit_agent, test_killswitch, test_conflict_resolution, test_community_trust
 ```
 
 ## Core concepts
@@ -465,7 +469,7 @@ Note: governance events land on `events-governance.jsonl` alongside all other st
 # Note: system Python is blocked by PEP 668 on macOS — always use .venv/bin/python
 ```
 
-556 tests, all passing (as of 2026-06-18). Coverage: EventBus, EventRouter, EventStore,
+605 tests, all passing (as of 2026-06-20). Coverage: EventBus, EventRouter, EventStore,
 AgentBase (all OODA short-circuit paths, AgentState defaults + world_model field, save_state/load_state with and without memory store, semantic/world_model tag separation, roundtrip), RALFExecutor (confidence rejection, learn, follow-up,
 _post_act_hook extension), ReActExecutor (happy path, max_steps, error handling, on_step hook,
 follow-up), PlanExecutor (all-complete, partial, failed, plan() raises, step exception recovery,
@@ -501,7 +505,9 @@ SkillOptExecutor (_apply_edits all ops, _is_protected block detection, accepted/
 FailurePatternAgent (observe gate, stream filter system+governance, FailureSignature clustering by terminal_cause/causal_status/agent_mechanism, materialise() → system.failure_pattern_detected, should_materialise override),
 SelfHarnessExecutor (retrieve loads failure_pattern_detected events, act() instantiates SkillOptExecutor via factory, evaluate() calls regression_gate() deterministically, follow_up emits harness.edit_accepted/rejected, max_iterations=3),
 CouncilExecutor (council_decision on complete, human_override on exhaustion/confidence rejection, evaluate isolation contract, opinions+question via context, gather_opinions wired via retrieve, causation chain, CouncilOpinion defaults + custom weight, default max_iterations=3, module boundary import check),
-EventHeadline (to_dict/from_dict round-trip, from_event: summary field + fallback + confidence suffix + truncation to 120, append_headline chunk_id sequential per stream, load_headlines newest-first + limit, expand_event correct event + None for unknown, compact_stream compatibility, stream isolation, EventBus publish writes headline + load_headlines + expand_event delegates).
+EventHeadline (to_dict/from_dict round-trip, from_event: summary field + fallback + confidence suffix + truncation to 120, append_headline chunk_id sequential per stream, load_headlines newest-first + limit, expand_event correct event + None for unknown, compact_stream compatibility, stream isolation, EventBus publish writes headline + load_headlines + expand_event delegates),
+CommunityFeedAdapter (constructor defaults, poll missing file, poll empty, reads entries, advances cursor, no new entries, TrustLevel.UNTRUSTED default, CommunityEventType, correlation_id from id/correlation_id/absent fields, custom name, malformed JSON skip, truncation reset, public API export),
+CommunityTrustLearner (analyse recommends after min_observations, no rec below threshold, halt veto, multiple sources independent, confidence scaling, confidence cap 0.9, tags include source, OODA pipeline window fill, OODA below threshold, full chain integration CommunityFeedAdapter→AuditAgent→learner, module boundary export).
 
 ## Dashboard
 
