@@ -76,6 +76,7 @@ Examples from current consumers:
 | ClickUpAdapter | `clickup.task_updated` | `clickup` |
 | SlackAdapter | `slack.message_received` | `slack` |
 | LocalGitAdapter | `git.commit_added` | `git` |
+| CommunityFeedAdapter | `community.entry_received` | `community` |
 
 ---
 

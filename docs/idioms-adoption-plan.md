@@ -690,6 +690,11 @@ _— arXiv:2606.09659 "LCLM: Long-Context Language Models" (headline compression
 29. ✅ `GovernanceEventType.COUNCIL_DECISION` added to `agentic_govkit/events/models.py` + event-catalog.md updated (2026-06-18)
 30. ✅ `events/headlines.py` — `EventHeadline` dataclass (event_id, stream, event_type, timestamp, headline ≤ 120 chars, chunk_id); `append_headline(store_dir, stream, event, headline)` writer; `load_headlines(store_dir, stream, limit)` reader; `expand_event(store_dir, stream, chunk_id)` O(1) lookup; stored in `headlines-<stream>.jsonl`; `EventBus.publish()` auto-writes headline; `compact_stream()` compatible; `EventBus.load_headlines()` + `EventBus.expand_event()` delegates added; exported from `agentic_loopkit.__init__`; tests in `tests/events/test_headlines.py` (2026-06-18)
 
+### v7 — community trust graduation pathway
+
+31. ✅ `adapters/community.py` — `CommunityFeedAdapter(PollingAdapter)` + `CommunityEventType`; polls a JSONL community feed file; byte-offset cursor (immune to compaction); `default_trust_level` param (default `TrustLevel.UNTRUSTED`); truncation detection resets cursor on file rotation; `_entry_to_event()` hook for consumer-domain overrides; emits `community.entry_received`; 17 tests in `tests/adapters/test_community.py` (2026-06-20)
+32. ✅ `agentic_govkit/agents/community_trust.py` — `CommunityTrustLearner(GovernanceLearningAgent)`; concrete AIMA Learning Element for community feed trust graduation; `analyse()` inspects rolling window for UNTRUSTED sources with clean observation counts ≥ `min_observations`; emits `governance.policy_recommendation` recommending UNTRUSTED → LOW graduation at `TrustLevel.HIGH`; graduation is always one level at a time; halt signals from `KillSwitchAgent` veto graduation; 11 tests in `tests/govkit/test_community_trust.py` (2026-06-20)
+
 ---
 
 ## Source

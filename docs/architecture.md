@@ -394,6 +394,7 @@ event = expand_event(bus.store_dir, stream="harness", chunk_id=headlines[0].chun
 | `ClickUpAdapter` | `adapters/clickup.py` | ClickUp REST API | Unix ms timestamp | ✅ Built (2026-05-01) |
 | `SlackAdapter`   | `adapters/slack.py`   | Slack `conversations.history` | `{channel_id: ts}` dict | ✅ Built (2026-05-05) |
 | `LocalGitAdapter` | `adapters/git.py`   | Local git repo (`git log`) | commit SHA | ✅ Built (2026-05-05) |
+| `CommunityFeedAdapter` | `adapters/community.py` | JSONL community feed | byte offset | ✅ Built (2026-06-20) |
 
 ### Dashboard (see `docs/dashboard-architecture.md`)
 
@@ -513,6 +514,10 @@ Install via `pip install agentic-loopkit[governance]`.
   calls `analyse()` (LLM phase in `orient()`) to identify policy drift. Emits
   `governance.policy_recommendation` per recommendation at `TrustLevel.HIGH`. Self-excludes own
   events and `policy_recommendation`/`policy_applied` to prevent feedback loops.
+- **`CommunityTrustLearner`** — concrete `GovernanceLearningAgent` subclass. Analyses community
+  feed events from `AuditAgent` to recommend one-level trust graduation (UNTRUSTED → LOW) when
+  a source accumulates sufficient clean observations above `min_observations`. Emits
+  `governance.policy_recommendation` at `TrustLevel.HIGH`; graduation is one level at a time only.
 - **`GovernanceEventType`** — full vocabulary:
   - `governance.depth_exceeded` — `delegation_depth > max_delegation_depth`
   - `governance.trust_escalation` — `trust_level == UNTRUSTED`
@@ -525,6 +530,7 @@ Install via `pip install agentic-loopkit[governance]`.
   - `governance.quarantine` — source quarantined by `KillSwitchAgent`
   - `governance.policy_recommendation` — policy adjustment recommended by `GovernanceLearningAgent`
   - `governance.policy_applied` — policy recommendation accepted and applied by operator
+  - `governance.council_decision` — N-specialist weighted consensus reached by `CouncilExecutor`
 - **Module boundary contract**: `agentic_govkit → agentic_loopkit` (public API only); never reversed.
   Enforced by `tests/govkit/test_module_boundaries.py`.
 
