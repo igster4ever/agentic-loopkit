@@ -536,6 +536,39 @@ Install via `pip install agentic-loopkit[governance]`.
 
 ---
 
+## A2A protocol alignment
+
+agentic-loopkit was reviewed against the Agent2Agent (A2A) open protocol for design pattern alignment. Key adopted patterns and planned extensions:
+
+### ExecutorSkill declarations (planned)
+
+A2A Agent Cards declare `skills` — named, typed capability units. loopkit currently has no equivalent: executor capability is implicit in their event-type subscriptions. The planned `ExecutorSkill` dataclass (`executors/base.py`) mirrors this:
+
+```python
+class RALFExecutor(BaseExecutor):
+    skill = ExecutorSkill(
+        name="ralf-reflect",
+        description="Bounded Reflect-Analyse-Learn-Forward loop",
+        input_event_types=["*"],
+        output_event_types=["ralf.completed", "ralf.failed"],
+        tags=["reflection", "learning", "bounded"],
+    )
+```
+
+`EventBus.available_skills()` returns all declared skills from registered executors — enabling runtime discovery. When a loopkit node becomes A2A-addressable, `available_skills()` maps directly to the `skills` array in the Agent Card.
+
+### PollingAdapter / PushAdapter split (planned)
+
+A2A supports push-notification delivery (webhook on task completion). `PollingAdapter` covers the pull side. A `PushAdapter` base class is the planned complement — callback-registered, no tick loop, same `Event`-emission contract. The `CommunityFeedAdapter` currently extends `PollingAdapter` (git pull); a future A2A-compatible community feed source would extend `PushAdapter`.
+
+### A2A-aligned event status suffixes (convention)
+
+New executors follow A2A Task lifecycle suffixes in output event types: `.submitted`, `.working`, `.completed`, `.failed`, `.cancelled`. This aligns loopkit executor status signals with A2A Task states so a future A2A Task wrapper requires no field translation.
+
+Full design and rationale: [`a2a-protocol-alignment.md`](a2a-protocol-alignment.md)
+
+---
+
 ## Wire-in example (FastAPI lifespan)
 
 ```python
