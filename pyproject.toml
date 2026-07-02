@@ -38,6 +38,9 @@ Repository = "https://github.com/igster4ever/agentic-loopkit"
 [project.optional-dependencies]
 governance = []   # agentic-govkit — no extra runtime deps; depends only on agentic-loopkit
 
+# agentic-memorykit is not yet published to PyPI — install from source until it is
+memory = ["agentic-memorykit"]
+
 dashboard = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
