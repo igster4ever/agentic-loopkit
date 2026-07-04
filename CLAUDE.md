@@ -178,6 +178,7 @@ Reactive. Subscribe to streams; pipeline runs on each event:
 - `AgentState(episodic=[...], semantic={...}, procedural={...})` — never an opaque blob
 - Wire a store: `agent._memory_store = MemoryStore(store_dir)` (agentic-memorykit; no hard dep)
 - `procedural` bucket is reserved for v4+ behavioural adjustments; always `{}` in base impl
+- `await agent.recall(text, max_steps=3, limit_per_step=5, min_confidence=0.0)` (v8, P46) — real consumer of memorykit's `query_iterative()`; wires its `on_step` callback to emit `SystemEventType.MEMORY_QUERY_STEP` once per retrieval step; returns `[]` if no `_memory_store` is wired
 
 ### RALFExecutor (bounded task loop)
 Retrieve → Act → Learn → Follow-up. Hard cap at `max_iterations`.
@@ -631,6 +632,14 @@ class TechCouncil(CouncilExecutor):
     async def evaluate(self, artifact, rubric):
         ...  # isolated LLM check — no prior history
 ```
+
+**Gotcha — `GovernanceLearningAgent`'s shared analysis window is a trigger, not a scope.**
+`analysis_window` (default 20) only decides *when* `orient()` fires — once it does, `orient()`
+reloads the full `history_hours` (default 72h) of governance events from disk and dedupes with
+the in-memory window before calling `analyse()`. So a low-volume source is never starved by a
+high-volume one filling the window first: every trigger sees complete history, not just the
+last 20 events. Verified for `CommunityTrustLearner` via a live two-source concurrency test
+(`tests/govkit/test_community_trust_concurrency.py`, 2026-07-04).
 
 ### TrustLevel
 

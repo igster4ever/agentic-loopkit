@@ -39,6 +39,7 @@ class SystemEventType(StrEnum):
     ADAPTER_ALIVE            = "system.adapter_alive"
     ADAPTER_STALLED          = "system.adapter_stalled"
     FAILURE_PATTERN_DETECTED = "system.failure_pattern_detected"
+    MEMORY_QUERY_STEP        = "system.memory_query_step"
 
 
 class HarnessEventType(StrEnum):

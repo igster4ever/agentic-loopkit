@@ -637,6 +637,10 @@ from .loops.self_harness import SelfHarnessExecutor
 # v6 — multi-agent coordination + LCLM headline storage
 from .events.headlines import EventHeadline, append_headline, load_headlines, expand_event
 # from agentic_govkit import CouncilExecutor, CouncilOpinion
+
+# v8 — semantic memory integration (AgentBase.recall() — no new loopkit exports;
+# agentic_memorykit is a separate optional [memory] extra, imported by the consumer,
+# never by loopkit itself)
 ```
 
 ---
@@ -694,6 +698,13 @@ _— arXiv:2606.09659 "LCLM: Long-Context Language Models" (headline compression
 
 31. ✅ `adapters/community.py` — `CommunityFeedAdapter(PollingAdapter)` + `CommunityEventType`; polls a JSONL community feed file; byte-offset cursor (immune to compaction); `default_trust_level` param (default `TrustLevel.UNTRUSTED`); truncation detection resets cursor on file rotation; `_entry_to_event()` hook for consumer-domain overrides; emits `community.entry_received`; 17 tests in `tests/adapters/test_community.py` (2026-06-20)
 32. ✅ `agentic_govkit/agents/community_trust.py` — `CommunityTrustLearner(GovernanceLearningAgent)`; concrete AIMA Learning Element for community feed trust graduation; `analyse()` inspects rolling window for UNTRUSTED sources with clean observation counts ≥ `min_observations`; emits `governance.policy_recommendation` recommending UNTRUSTED → LOW graduation at `TrustLevel.HIGH`; graduation is always one level at a time; halt signals from `KillSwitchAgent` veto graduation; 11 tests in `tests/govkit/test_community_trust.py` (2026-06-20)
+
+### v8 — semantic memory integration (`agentic-memorykit`)
+_Companion package: `igster4ever/agentic-memorykit` (separate repo, own compass namespace)._
+
+33. ✅ `pyproject.toml` — `[memory]` optional extra added, depends on `agentic_memorykit`; no hard dependency (2026-07-02)
+34. ✅ `tests/agents/test_memorykit_integration.py` — 3 tests proving `AgentBase._memory_store` round-trips through a real `agentic_memorykit.MemoryStore` (write/load_state, agent-ID isolation); no code changes needed — the duck-typed hook already matched memorykit's real `write()`/`list()` signatures (2026-07-02)
+35. ✅ `agents/base.py` — `AgentBase.recall(text, max_steps, limit_per_step, min_confidence)`: real consumer of memorykit's `query_iterative()` (P46); wires its `on_step` callback to `events/models.py`'s new `SystemEventType.MEMORY_QUERY_STEP`, emitted via `self._bus.publish()` once per retrieval step; `tests/agents/test_memorykit_query_iterative.py` — 4 tests (2026-07-04)
 
 ---
 

@@ -38,7 +38,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Optional
 
-from ..events.models import Event
+from ..events.models import Event, SystemEventType
 
 if TYPE_CHECKING:
     from ..bus import EventBus
@@ -179,6 +179,45 @@ class AgentBase(ABC):
             wm_records  = await self._memory_store.list(agent_id=self.name, tags=["world_model"])
             world_model = {r.key: r.value for r in wm_records}
         return AgentState(episodic=[], semantic=semantic, procedural={}, world_model=world_model)
+
+    async def recall(
+        self,
+        text: str,
+        *,
+        max_steps: int = 3,
+        limit_per_step: int = 5,
+        min_confidence: float = 0.0,
+    ) -> list[Any]:
+        """Iterative, evidence-conditioned recall via _memory_store.query_iterative() (P46).
+
+        Each retrieval step emits system.memory_query_step on the bus — the
+        on_step injection point query_iterative() exposes, wired here so callers
+        get an observable event per step rather than a single opaque result list.
+        Returns [] if no _memory_store is wired.
+        """
+        if self._memory_store is None:
+            return []
+
+        async def _on_step(step: int, query_text: str, new_results: list) -> None:
+            await self._bus.publish(Event(
+                event_type=SystemEventType.MEMORY_QUERY_STEP,
+                source=self.name,
+                payload={
+                    "step": step,
+                    "query_text": query_text,
+                    "result_count": len(new_results),
+                    "keys": [record.key for record, _ in new_results],
+                },
+            ))
+
+        return await self._memory_store.query_iterative(
+            text,
+            agent_id=self.name,
+            max_steps=max_steps,
+            limit_per_step=limit_per_step,
+            min_confidence=min_confidence,
+            on_step=_on_step,
+        )
 
     # ── Diagnostics ───────────────────────────────────────────────────────────
 

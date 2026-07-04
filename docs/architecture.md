@@ -66,6 +66,8 @@ executor patterns layered on top.
 │                │ State persistence: save_state(AgentState) / load_state()  │
 │                │ decomposed by CoALA type (episodic, semantic, procedural). │
 │                │ Wire MemoryStore via _memory_store for semantic facts.     │
+│                │ recall(text) — iterative query_iterative() retrieval;     │
+│                │ emits system.memory_query_step per step (P46).            │
 ├────────────────┼────────────────────────────────────────────────────────────┤
 │ RALFExecutor   │ Bounded task loop. Triggered by a single event. Iterates  │
 │                │ retrieve → act → learn → follow_up. Hard cap on loops.    │
@@ -386,6 +388,27 @@ event = expand_event(bus.store_dir, stream="harness", chunk_id=headlines[0].chun
 
 **Built 2026-06-18.** Exported from `agentic_loopkit`: `EventHeadline`, `append_headline`,
 `load_headlines`, `expand_event`.
+
+### Semantic memory integration (`agentic_memorykit`, optional `[memory]` extra)
+
+`AgentBase._memory_store` is a duck-typed hook — set it to an `agentic_memorykit.MemoryStore`
+instance and `save_state()` / `load_state()` round-trip semantic + world_model facts through
+it automatically. No hard dependency; loopkit imports nothing from memorykit.
+
+```python
+from agentic_memorykit import MemoryStore
+
+agent._memory_store = MemoryStore(store_dir=Path("~/.cache/my-app/memory"))
+```
+
+**`AgentBase.recall(text, max_steps=3, limit_per_step=5, min_confidence=0.0)`** — the real
+consumer of memorykit's `query_iterative()` (P46, ✅ Built 2026-07-04). Runs sequential,
+evidence-conditioned retrieval and wires `query_iterative()`'s `on_step` callback to emit
+`system.memory_query_step` after every step — an observable event per retrieval hop rather
+than one opaque result list. Returns `[]` if no `_memory_store` is wired.
+
+Tests: `tests/agents/test_memorykit_query_iterative.py` (4 tests) and
+`tests/agents/test_memorykit_integration.py` (3 tests, basic write/list/load_state wiring).
 
 ### Additional adapters
 
