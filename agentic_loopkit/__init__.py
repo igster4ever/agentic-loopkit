@@ -32,6 +32,7 @@ from .loops.react import ReActExecutor, ReActResult, ReActStep
 from .loops.plan import PlanExecutor, PlanResult, PlanStep
 from .loops.reflexion import ReflexionExecutor
 from .loops.outcome import OutcomeExecutor
+from .loops.contract import VerificationContract
 from .loops.utility import UtilityExecutor, UtilityResult, UtilityCandidate
 from .loops.skillopt import SkillOptExecutor, SkillEdit, SkillOptResult
 from .loops.self_harness import SelfHarnessExecutor
@@ -92,6 +93,7 @@ __all__ = [
     "ReflexionExecutor",
     # Executors — Outcome
     "OutcomeExecutor",
+    "VerificationContract",
     # Executors — Utility
     "UtilityExecutor",
     "UtilityResult",
