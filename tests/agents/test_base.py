@@ -327,6 +327,41 @@ async def test_save_state_world_model_tagged_separately_from_semantic(tmp_path):
     assert len(wm_writes)  == 1 and wm_writes[0][0]  == "cause"
 
 
+async def test_save_state_derives_content_tags_from_key(tmp_path):
+    # P46/P59/P60 finding (2026-07-06): a blanket "semantic"/"world_model" tag
+    # on every fact gives query_iterative()'s evidence-conditioning heuristic
+    # nothing to condition on. save_state() must also derive tags from the key
+    # itself so recall() has real query-relevant vocabulary to expand into.
+    bus = EventBus(store_dir=tmp_path)
+    agent = RecordingAgent("agent", bus)
+    store = _MockMemoryStore()
+    agent._memory_store = store
+
+    await agent.save_state(AgentState(
+        semantic={"adapterErrorPattern": "x"},
+        world_model={"stall_reason": "y"},
+    ))
+
+    sem_write = next(w for w in store._written if w[0] == "adapterErrorPattern")
+    wm_write  = next(w for w in store._written if w[0] == "stall_reason")
+    assert set(sem_write[3]) == {"semantic", "adapter", "error", "pattern"}
+    assert set(wm_write[3])  == {"world_model", "stall", "reason"}
+
+
+async def test_load_state_unaffected_by_added_content_tags(tmp_path):
+    # The extra derived tags must not break the exact "semantic"/"world_model"
+    # filter load_state() relies on to reconstruct state.
+    bus = EventBus(store_dir=tmp_path)
+    agent = RecordingAgent("agent", bus)
+    store = _MockMemoryStore()
+    agent._memory_store = store
+
+    await agent.save_state(AgentState(semantic={"adapterErrorPattern": "x"}))
+    state = await agent.load_state()
+
+    assert state.semantic == {"adapterErrorPattern": "x"}
+
+
 async def test_load_state_reads_world_model_from_memory_store(tmp_path):
     bus = EventBus(store_dir=tmp_path)
     agent = RecordingAgent("agent", bus)

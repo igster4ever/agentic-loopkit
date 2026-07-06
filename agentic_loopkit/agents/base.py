@@ -34,6 +34,7 @@ Example:
 from __future__ import annotations
 
 import logging
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Optional
@@ -44,6 +45,22 @@ if TYPE_CHECKING:
     from ..bus import EventBus
 
 log = logging.getLogger("agentic_loopkit.agent")
+
+_KEY_TOKEN_RE = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+")
+
+
+def _tags_from_key(key: str) -> list[str]:
+    """Derive content-descriptive tags from a state key (snake_case or camelCase).
+
+    query_iterative()'s (P46) evidence-conditioning heuristic unions tags across
+    a step's results and folds them into the next query's text. A blanket
+    "semantic"/"world_model" tag on every fact (the only tags save_state() used
+    to write) gives it nothing to condition on — every step re-derives the same
+    one token, since BaseStore.query() ranks by content, not by tag identity.
+    Splitting the key into its constituent words gives each fact at least some
+    query-relevant vocabulary without requiring callers to hand-tag state.
+    """
+    return [w.lower() for w in _KEY_TOKEN_RE.findall(key) if len(w) > 1]
 
 
 @dataclass
@@ -158,11 +175,13 @@ class AgentBase(ABC):
         if self._memory_store is not None:
             for key, value in state.semantic.items():
                 await self._memory_store.write(
-                    key, str(value), agent_id=self.name, tags=["semantic"]
+                    key, str(value), agent_id=self.name,
+                    tags=["semantic", *_tags_from_key(key)],
                 )
             for key, value in state.world_model.items():
                 await self._memory_store.write(
-                    key, str(value), agent_id=self.name, tags=["world_model"]
+                    key, str(value), agent_id=self.name,
+                    tags=["world_model", *_tags_from_key(key)],
                 )
 
     async def load_state(self) -> AgentState:
@@ -198,7 +217,9 @@ class AgentBase(ABC):
         if self._memory_store is None:
             return []
 
-        async def _on_step(step: int, query_text: str, new_results: list) -> None:
+        async def _on_step(
+            step: int, query_text: str, new_results: list, evidence_tags: list[str]
+        ) -> None:
             await self._bus.publish(Event(
                 event_type=SystemEventType.MEMORY_QUERY_STEP,
                 source=self.name,
@@ -207,6 +228,7 @@ class AgentBase(ABC):
                     "query_text": query_text,
                     "result_count": len(new_results),
                     "keys": [record.key for record, _ in new_results],
+                    "evidence_tags": evidence_tags,
                 },
             ))
 

@@ -73,3 +73,36 @@ async def test_load_state_isolates_by_agent_id(tmp_path):
     state_b = await agent_b.load_state()
     assert state_a.semantic == {"key": "a-value"}
     assert state_b.semantic == {"key": "b-value"}
+
+
+async def test_recall_evidence_conditioning_uses_real_saved_state_tags(tmp_path):
+    # Regression test for the P46/P59/P60 finding (2026-07-06): before this
+    # fix, save_state() tagged every fact "semantic" or "world_model" only,
+    # so recall()'s evidence-conditioning step always re-derived the same
+    # single blanket tag and stopped after one redundant round-trip. With
+    # key-derived tags, evidence_tags carry real vocabulary from the second
+    # fact's key onward.
+    bus = EventBus(store_dir=tmp_path / "events")
+    agent = RememberingAgent("rememberer", bus)
+    agent._memory_store = MemoryStore(store_dir=tmp_path / "memory")
+
+    await agent.save_state(AgentState(semantic={
+        "adapterErrorPattern": "ClickUp 429s cluster around poll interval",
+        "clickupBackoffFix": "Exponential backoff resolves the 429 cluster",
+    }))
+
+    received = []
+
+    async def _collect(event):
+        received.append(event)
+    bus.router.subscribe("system", _collect)
+
+    await agent.recall("adapter error", max_steps=3, limit_per_step=1)
+
+    from agentic_loopkit.events.models import SystemEventType
+    step_events = [e for e in received if e.event_type == SystemEventType.MEMORY_QUERY_STEP]
+    assert step_events
+    all_evidence_tags = {t for e in step_events for t in e.payload["evidence_tags"]}
+    # Real content vocabulary from the keys, not just the structural tag
+    assert all_evidence_tags & {"adapter", "error", "pattern"}
+    assert all_evidence_tags != {"semantic"}

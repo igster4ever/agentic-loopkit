@@ -79,6 +79,10 @@ async def test_recall_emits_memory_query_step_per_step(tmp_path):
     assert "step" in step_events[0].payload
     assert "query_text" in step_events[0].payload
     assert "result_count" in step_events[0].payload
+    assert "evidence_tags" in step_events[0].payload
+    assert step_events[0].payload["evidence_tags"] == sorted(
+        set(step_events[0].payload["evidence_tags"])
+    )
 
 
 async def test_recall_query_step_events_are_persisted(tmp_path):

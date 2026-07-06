@@ -23,9 +23,12 @@ Update this file when adding new event types to either module.
 | `system.memory_query_step` | `AgentBase.recall()` | monitoring agents, dashboard |
 
 Payload fields for `system.memory_query_step`: `step` (int), `query_text` (str, evidence-expanded
-after step 0), `result_count` (int), `keys` (list of matched `MemoryRecord.key`). Emitted by
-`AgentBase.recall()` via `agentic_memorykit`'s `query_iterative()` `on_step` callback — one event
-per retrieval hop (P46, real consumer ✅ 2026-07-04).
+after step 0), `result_count` (int), `keys` (list of matched `MemoryRecord.key`), `evidence_tags`
+(list of tags this step's results carried, used to expand the next step's query — added
+2026-07-06 alongside the fix making `AgentBase.save_state()` derive content tags from state keys
+instead of a blanket `semantic`/`world_model` label, so evidence-conditioning has real vocabulary
+to work with). Emitted by `AgentBase.recall()` via `agentic_memorykit`'s `query_iterative()`
+`on_step` callback — one event per retrieval hop (P46, real consumer ✅ 2026-07-04).
 
 ### `projection.*` — Live document materialisation
 
