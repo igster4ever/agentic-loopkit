@@ -1,6 +1,6 @@
 # VerificationContract — design note (P55e)
 
-**Status:** Design — no implementation yet.
+**Status:** ✅ Implemented 2026-07-05 — `agentic_loopkit/loops/contract.py`, exported from the package top-level alongside `OutcomeExecutor`, 8 tests (`tests/loops/test_contract.py`). Shipped exactly as designed below — no lifecycle change, no new event types.
 **Origin:** compass P55 (Verification Contract / DoD 2.0) — `~/.claude/skills/compass/docs/verification-contract-design.md`.
 **Source:** compass session 2026-07-03, re-derived against the actual loopkit codebase (the original compass-side sketch predated a codebase read and invented interfaces — `ExecutorAdapter`, `execute()`/`verify()`, new `LoopEventType` members — that do not exist here; see "What the original design got wrong" below).
 
@@ -28,7 +28,7 @@ So P55e's actual job is much smaller than originally scoped: give `OutcomeExecut
 
 ---
 
-## Proposed addition: `VerificationContract` (data shape only)
+## Shipped addition: `VerificationContract` (data shape only)
 
 A plain dataclass + one convenience method — no new executor, no new event types, no change to `OutcomeExecutor`'s existing contract:
 
