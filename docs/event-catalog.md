@@ -21,6 +21,7 @@ Update this file when adding new event types to either module.
 | `system.adapter_stalled` | `PollingAdapter` | alerting agents, kill-switch |
 | `system.failure_pattern_detected` | `FailurePatternAgent` subclass | `GovernanceLearningAgent`, `SelfHarnessExecutor`, dashboard |
 | `system.memory_query_step` | `AgentBase.recall()` | monitoring agents, dashboard |
+| `system.calibration_recorded` | `OutcomeExecutor._post_act_hook()` | monitoring agents, future `CalibrationAggregatorAgent` |
 
 Payload fields for `system.memory_query_step`: `step` (int), `query_text` (str, evidence-expanded
 after step 0), `result_count` (int), `keys` (list of matched `MemoryRecord.key`), `evidence_tags`
@@ -29,6 +30,14 @@ after step 0), `result_count` (int), `keys` (list of matched `MemoryRecord.key`)
 instead of a blanket `semantic`/`world_model` label, so evidence-conditioning has real vocabulary
 to work with). Emitted by `AgentBase.recall()` via `agentic_memorykit`'s `query_iterative()`
 `on_step` callback — one event per retrieval hop (P46, real consumer ✅ 2026-07-04).
+
+Payload fields for `system.calibration_recorded` (P60): `iteration` (int), `self_predicted` (float,
+`RALFResult.confidence` from `act()` before `_post_act_hook` overwrites it), `actual` (float, 1.0 if
+`evaluate()` returned satisfied else 0.0), `gap` (float, `1 - (self_predicted - actual) ** 2` —
+RLMF's `Z_g` shape). Emitted once per iteration by every `OutcomeExecutor` subclass automatically
+— no opt-in required, since the underlying `CalibrationRecord` (`loops/calibration.py`) is computed
+entirely from data `_post_act_hook()` already has in scope. Diagnostic only; no aggregation in
+loopkit itself (left to a `ProjectionAgent` subclass or the consuming app) ✅ shipped 2026-07-09.
 
 ### `projection.*` — Live document materialisation
 

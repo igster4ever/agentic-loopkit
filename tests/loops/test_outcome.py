@@ -459,3 +459,68 @@ async def test_evaluate_not_called_with_prior_history(tmp_path):
     assert captured[0]["rubric"] == _RUBRIC
     # No context, history, or event data snuck in
     assert set(captured[0].keys()) == {"artifact", "rubric"}
+
+
+# ── Calibration event emission (P60) ─────────────────────────────────────────
+
+async def test_calibration_recorded_on_satisfied(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    executor = FixedOutcomeExecutor("e", bus, ralf_result("complete", confidence=0.8))
+    await executor.run(make_event())
+    events = load_events("system", store_dir=tmp_path)
+    calib = [e for e in events if e.event_type == "system.calibration_recorded"]
+    assert len(calib) == 1
+    assert calib[0].payload["self_predicted"] == 0.8
+    assert calib[0].payload["actual"] == 1.0
+
+
+async def test_calibration_recorded_on_not_satisfied(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+
+    def evaluate_fn(artifact, rubric):
+        if not hasattr(evaluate_fn, "_called"):
+            evaluate_fn._called = True
+            return False, ["gap"]
+        return True, []
+
+    executor = FixedOutcomeExecutor("e", bus, ralf_result("complete", confidence=0.9), evaluate_fn)
+    await executor.run(make_event())
+    events = load_events("system", store_dir=tmp_path)
+    calib = sorted(
+        (e for e in events if e.event_type == "system.calibration_recorded"),
+        key=lambda e: e.payload["iteration"],
+    )
+    assert len(calib) == 2
+    assert calib[0].payload["actual"] == 0.0
+    assert calib[1].payload["actual"] == 1.0
+
+
+async def test_calibration_gap_reflects_confident_and_wrong(tmp_path):
+    """Confidence=1.0 but not satisfied should yield gap=0.0 (worst calibration)."""
+    bus = EventBus(store_dir=tmp_path)
+
+    class OnceExecutor(OutcomeExecutor):
+        max_iterations = 1
+        @property
+        def rubric(self): return _RUBRIC
+        async def retrieve(self, event): return {}
+        async def act(self, context, prior):
+            return ralf_result("complete", confidence=1.0)
+        async def evaluate(self, artifact, rubric):
+            return False, ["still missing"]
+
+    await OnceExecutor("e", bus).run(make_event())
+    events = load_events("system", store_dir=tmp_path)
+    calib = [e for e in events if e.event_type == "system.calibration_recorded"]
+    assert len(calib) == 1
+    assert calib[0].payload["gap"] == 0.0
+
+
+async def test_calibration_recorded_has_source_and_iteration(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    executor = FixedOutcomeExecutor("named-executor", bus, ralf_result("complete", confidence=0.6))
+    await executor.run(make_event())
+    events = load_events("system", store_dir=tmp_path)
+    calib = [e for e in events if e.event_type == "system.calibration_recorded"]
+    assert calib[0].source == "named-executor"
+    assert calib[0].payload["iteration"] == 0

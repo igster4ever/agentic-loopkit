@@ -40,6 +40,7 @@ class SystemEventType(StrEnum):
     ADAPTER_STALLED          = "system.adapter_stalled"
     FAILURE_PATTERN_DETECTED = "system.failure_pattern_detected"
     MEMORY_QUERY_STEP        = "system.memory_query_step"
+    CALIBRATION_RECORDED     = "system.calibration_recorded"
 
 
 class HarnessEventType(StrEnum):

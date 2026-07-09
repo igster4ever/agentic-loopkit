@@ -34,6 +34,8 @@ The OODA+ReAct composition pattern is documented as the canonical wiring example
 | `HarnessEventType` + `harness.*` stream | **Build** | `events/models.py` extension | v5-2 | ✅ Built 2026-06-16 |
 | `SkillOptExecutor` + `SkillEdit` + `RejectedEdit` | **Build** | `loops/skillopt.py` | v5-3 | ✅ Built 2026-06-11 |
 | `SelfHarnessExecutor` | **Build** | `loops/self_harness.py` | v5-4 | ✅ Built 2026-06-16 |
+| `CalibrationRecord` (self-prediction calibration, P60) | **Build** | `loops/calibration.py` | v8 | ✅ Built 2026-07-09 |
+| `BranchScore` + `FrontierSelector` (frontier selection, P62a, arXiv:2607.05297) | **Build** | `loops/frontier.py` | v8 | ✅ Built 2026-07-09 |
 
 ---
 
@@ -255,6 +257,16 @@ class OutcomeExecutor(RALFExecutor):
 - **Gap feedback in `prior_result.output`** — when not satisfied, the gaps are prepended to the
   previous artifact in `prior_result.output` so the next `act()` iteration has clear revision context.
 - **`max_iterations = 3` default** — matches the Anthropic Managed Agents default (max 20).
+- **Self-prediction calibration (P60, ✅ shipped 2026-07-09)** — `result.confidence` from `act()`
+  *is* the agent's self-predicted completion score; `_post_act_hook()` overwrites it with
+  `1.0`/`0.5` per the rule above, discarding the original value. Before that overwrite,
+  `_post_act_hook()` now computes a `CalibrationRecord` (`loops/calibration.py`) pairing the
+  self-predicted confidence against `evaluate()`'s `satisfied` ground truth, and emits
+  `SystemEventType.CALIBRATION_RECORDED` on the `system` stream — one event per iteration,
+  automatically, for every `OutcomeExecutor` subclass. No new abstract method, no opt-in.
+  Diagnostic only; aggregation across runs is explicitly out of scope for loopkit itself
+  (left to a `ProjectionAgent` subclass or the consuming app) — see
+  `docs/self-prediction-calibration-design.md`.
 
 ### Comparison with ReflexionExecutor
 
@@ -641,6 +653,13 @@ from .events.headlines import EventHeadline, append_headline, load_headlines, ex
 # v8 — semantic memory integration (AgentBase.recall() — no new loopkit exports;
 # agentic_memorykit is a separate optional [memory] extra, imported by the consumer,
 # never by loopkit itself)
+
+# v8 — self-prediction calibration (P60)
+from .loops.calibration import CalibrationRecord
+from .events.models import SystemEventType   # SystemEventType.CALIBRATION_RECORDED
+
+# v8 — frontier selection (P62a)
+from .loops.frontier import BranchScore, FrontierCandidate, FrontierSelector
 ```
 
 ---
@@ -705,6 +724,12 @@ _Companion package: `igster4ever/agentic-memorykit` (separate repo, own compass 
 33. ✅ `pyproject.toml` — `[memory]` optional extra added, depends on `agentic_memorykit`; no hard dependency (2026-07-02)
 34. ✅ `tests/agents/test_memorykit_integration.py` — 3 tests proving `AgentBase._memory_store` round-trips through a real `agentic_memorykit.MemoryStore` (write/load_state, agent-ID isolation); no code changes needed — the duck-typed hook already matched memorykit's real `write()`/`list()` signatures (2026-07-02)
 35. ✅ `agents/base.py` — `AgentBase.recall(text, max_steps, limit_per_step, min_confidence)`: real consumer of memorykit's `query_iterative()` (P46); wires its `on_step` callback to `events/models.py`'s new `SystemEventType.MEMORY_QUERY_STEP`, emitted via `self._bus.publish()` once per retrieval step; `tests/agents/test_memorykit_query_iterative.py` — 4 tests (2026-07-04)
+
+### v8 — self-prediction calibration + frontier selection (MetaSkill-Evolve carryforward)
+_Source: arXiv:2607.05297 "MetaSkill-Evolve: Recursive Self-Improvement of LLM Agents via Two-Timescale Meta-Skill Evolution" (2026-07-08) — design: `~/.claude/skills/compass/docs/metaskill-evolve-design.md`_
+
+36. ✅ `loops/calibration.py` — `CalibrationRecord` (P60): dataclass (`executor_name`, `iteration`, `self_predicted`, `actual`, `gap`) + `compute()`; wired into `OutcomeExecutor._post_act_hook()` before the confidence overwrite; emits `SystemEventType.CALIBRATION_RECORDED` per iteration for every `OutcomeExecutor` subclass automatically; diagnostic only, no aggregation; 12 tests across `tests/loops/test_calibration.py` + `tests/loops/test_outcome.py` (2026-07-09)
+37. ✅ `loops/frontier.py` — `BranchScore` + `FrontierCandidate` + `FrontierSelector` (P62a): generalises the paper's `η₁U + η₂P̂ + η₃N` frontier-selection formula into a domain-agnostic ranking primitive; default productivity estimator = mean utility delta over `utility_history` (paper's Eq. 3 shape); default novelty estimator = `1/(1+times_selected)` visit-cooling; both overridable via `productivity_fn`/`novelty_fn`; scoring primitive only — no branch-forking pipeline, no persistent evolution DAG; 16 tests in `tests/loops/test_frontier.py` (2026-07-09)
 
 ---
 

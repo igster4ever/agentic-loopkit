@@ -358,6 +358,8 @@ RALF variants extend `RALFExecutor` via `_post_act_hook()` — never by copying 
 | `FailurePatternAgent` | `agents/failure_pattern.py` | `ProjectionAgent` subclass; clusters error events by `FailureSignature(terminal_cause, causal_status, agent_mechanism)`; emits `system.failure_pattern_detected` | ✅ Built (2026-06-16) |
 | `SelfHarnessExecutor` | `loops/self_harness.py` | `OutcomeExecutor` subclass; wires `FailurePatternAgent` → `SkillOptExecutor` → `AgentTestHarness.regression_gate()` → emit `harness.edit_accepted/rejected`; evaluate() is deterministic — no LLM | ✅ Built (2026-06-16) |
 | `CouncilExecutor` | `agentic_govkit/loops/council.py` | `OutcomeExecutor` subclass (govkit); submits question to N specialist agents in parallel; isolated `evaluate()` for consensus quality gate; emits `governance.council_decision` on consensus or `governance.human_override` on failure | ✅ Built (2026-06-18) |
+| `CalibrationRecord` | `loops/calibration.py` | P60 — self-prediction calibration; `OutcomeExecutor._post_act_hook()` pairs `act()`'s `result.confidence` against `evaluate()`'s `satisfied` before the confidence overwrite; emits `system.calibration_recorded` per iteration; diagnostic only, no aggregation | ✅ Built (2026-07-09) |
+| `FrontierSelector` | `loops/frontier.py` | P62a — generalises MetaSkill-Evolve's frontier-selection formula (`η₁U + η₂P̂ + η₃N`) into a domain-agnostic ranking primitive over `FrontierCandidate` pools; sibling to `UtilityExecutor` (ranks an existing candidate pool + history, not a fresh generate-and-rank pass); scoring primitive only, no branch-forking pipeline | ✅ Built (2026-07-09) |
 
 ### EventMeta convention (see `CLAUDE.md`)
 

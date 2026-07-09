@@ -31,7 +31,13 @@ agentic_loopkit/
 │   ├── react.py             # ReActExecutor — bounded tool-use loop (think → execute, action="done")
 │   ├── plan.py              # PlanExecutor — front-loaded decomposition (plan → execute_step × N)
 │   ├── reflexion.py         # ReflexionExecutor — RALFExecutor + critique() between act() and learn()
-│   └── outcome.py           # OutcomeExecutor — RALFExecutor + rubric-governed isolated evaluation
+│   ├── outcome.py           # OutcomeExecutor — RALFExecutor + rubric-governed isolated evaluation
+│   ├── utility.py           # UtilityExecutor — generate-and-rank single-pass; UtilityResult + UtilityCandidate
+│   ├── skillopt.py          # SkillOptExecutor — bounded skill optimiser; SkillEdit + RejectedEdit + SkillOptResult
+│   ├── self_harness.py      # SelfHarnessExecutor — OutcomeExecutor subclass; FailurePatternAgent → SkillOptExecutor → AgentTestHarness.regression_gate()
+│   ├── contract.py          # VerificationContract — criteria/evidence_type/stopping_condition; to_rubric() bridges into OutcomeExecutor.rubric
+│   ├── calibration.py       # CalibrationRecord (P60) — self-prediction vs. verified-outcome gap; wired into OutcomeExecutor._post_act_hook()
+│   └── frontier.py          # BranchScore + FrontierCandidate + FrontierSelector (P62a) — utility + productivity + novelty ranking primitive
 │
 ├── utils/
 │   └── time.py              # Shared UTC helpers: utc_now(), iso_format(), now_ms(), now_unix(), ms_to_iso()

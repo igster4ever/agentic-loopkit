@@ -34,7 +34,8 @@ import logging
 from abc import abstractmethod
 from typing import Any, Optional
 
-from ..events.models import Event
+from ..events.models import Event, SystemEventType
+from .calibration import CalibrationRecord
 from .ralf import RALFExecutor, RALFResult
 
 log = logging.getLogger("agentic_loopkit.outcome")
@@ -166,8 +167,27 @@ class OutcomeExecutor(RALFExecutor):
         Needs revision → ``status="in_progress"``, ``confidence=0.5``; gap
         feedback is prepended to the output so the next ``act()`` call receives
         it via ``prior_result.output``.
+
+        Before the confidence overwrite, emits ``SystemEventType.CALIBRATION_RECORDED``
+        (P60) pairing ``result.confidence`` from ``act()`` against ``satisfied`` —
+        the self-prediction vs. verified-outcome gap for this iteration.
         """
         satisfied, gaps = await self.evaluate(result.output, self.rubric)
+
+        calibration = CalibrationRecord.compute(
+            executor_name=self.name, iteration=iteration,
+            self_predicted=result.confidence, satisfied=satisfied,
+        )
+        await self._bus.publish(Event(
+            event_type=SystemEventType.CALIBRATION_RECORDED,
+            source=self.name,
+            payload={
+                "iteration": calibration.iteration,
+                "self_predicted": calibration.self_predicted,
+                "actual": calibration.actual,
+                "gap": calibration.gap,
+            },
+        ))
 
         if satisfied:
             log.debug(
