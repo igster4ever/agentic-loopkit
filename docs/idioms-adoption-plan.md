@@ -34,6 +34,7 @@ The OODA+ReAct composition pattern is documented as the canonical wiring example
 | `HarnessEventType` + `harness.*` stream | **Build** | `events/models.py` extension | v5-2 | ✅ Built 2026-06-16 |
 | `SkillOptExecutor` + `SkillEdit` + `RejectedEdit` | **Build** | `loops/skillopt.py` | v5-3 | ✅ Built 2026-06-11 |
 | `SelfHarnessExecutor` | **Build** | `loops/self_harness.py` | v5-4 | ✅ Built 2026-06-16 |
+| `VerificationContract` (criteria/evidence/stopping-condition → rubric bridge, P55e) | **Build** | `loops/contract.py` | v8 | ✅ Built 2026-07-05 |
 | `CalibrationRecord` (self-prediction calibration, P60) | **Build** | `loops/calibration.py` | v8 | ✅ Built 2026-07-09 |
 | `BranchScore` + `FrontierSelector` (frontier selection, P62a, arXiv:2607.05297) | **Build** | `loops/frontier.py` | v8 | ✅ Built 2026-07-09 |
 
@@ -257,6 +258,12 @@ class OutcomeExecutor(RALFExecutor):
 - **Gap feedback in `prior_result.output`** — when not satisfied, the gaps are prepended to the
   previous artifact in `prior_result.output` so the next `act()` iteration has clear revision context.
 - **`max_iterations = 3` default** — matches the Anthropic Managed Agents default (max 20).
+- **`VerificationContract` bridge (P55e, ✅ shipped 2026-07-05)** — `loops/contract.py` defines a
+  `VerificationContract` dataclass (`criteria`, `evidence_type`, `stopping_condition`) with a
+  `to_rubric()` method producing rubric text compatible with the `rubric` property above —
+  no lifecycle change, no new abstract method. `from_goal_contract()` constructs one directly
+  from a compass `goal_contracts` entry, making compass's pre-specified success criteria
+  (P55) usable as an `OutcomeExecutor` rubric with no manual translation step.
 - **Self-prediction calibration (P60, ✅ shipped 2026-07-09)** — `result.confidence` from `act()`
   *is* the agent's self-predicted completion score; `_post_act_hook()` overwrites it with
   `1.0`/`0.5` per the rule above, discarding the original value. Before that overwrite,
@@ -653,6 +660,9 @@ from .events.headlines import EventHeadline, append_headline, load_headlines, ex
 # v8 — semantic memory integration (AgentBase.recall() — no new loopkit exports;
 # agentic_memorykit is a separate optional [memory] extra, imported by the consumer,
 # never by loopkit itself)
+
+# v8 — verification contract (P55e)
+from .loops.contract import VerificationContract
 
 # v8 — self-prediction calibration (P60)
 from .loops.calibration import CalibrationRecord

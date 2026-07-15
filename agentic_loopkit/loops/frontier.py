@@ -47,11 +47,13 @@ class FrontierCandidate:
     the winner. Used by the default novelty (visit-cooling) estimator.
     """
 
-    id:              str
-    artifact:        Any
-    utility:         float
-    utility_history: list[float] = field(default_factory=list)
-    times_selected:  int = 0
+    id:                  str
+    artifact:            Any
+    utility:             float
+    utility_history:     list[float] = field(default_factory=list)
+    times_selected:      int = 0
+    revoked:             bool = False
+    revocation_reason:   Optional[str] = None
 
 
 class FrontierSelector:
@@ -91,6 +93,19 @@ class FrontierSelector:
     def _default_novelty(candidate: FrontierCandidate) -> float:
         return 1.0 / (1.0 + candidate.times_selected)
 
+    @staticmethod
+    def revoke(candidate: FrontierCandidate, reason: str) -> None:
+        """
+        De-authorize a candidate branch — e.g. a later regression traced back to
+        it. Revocation is permanent and absolute: unlike novelty/productivity,
+        which merely shift a candidate's rank via future utility_history, a
+        revoked candidate is excluded from rank()/select() entirely regardless
+        of any utility it accrues afterward. Callers still holding a reference
+        to the candidate see the recorded reason via ``revocation_reason``.
+        """
+        candidate.revoked = True
+        candidate.revocation_reason = reason
+
     def score(self, candidate: FrontierCandidate) -> BranchScore:
         return BranchScore(
             utility=candidate.utility,
@@ -102,8 +117,14 @@ class FrontierSelector:
     def rank(
         self, candidates: list[FrontierCandidate]
     ) -> list[tuple[FrontierCandidate, BranchScore]]:
-        """Return (candidate, BranchScore) pairs, highest score() first."""
-        scored = [(c, self.score(c)) for c in candidates]
+        """Return (candidate, BranchScore) pairs, highest score() first.
+
+        Revoked candidates are excluded entirely — they never surface, even
+        at the bottom of the ranking.
+        """
+        scored = [
+            (c, self.score(c)) for c in candidates if not c.revoked
+        ]
         scored.sort(key=lambda pair: pair[1].score(), reverse=True)
         return scored
 

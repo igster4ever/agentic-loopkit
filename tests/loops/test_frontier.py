@@ -8,6 +8,7 @@ Covers:
   - FrontierSelector.rank() ordering
   - FrontierSelector.select() returns top candidate, None on empty pool
   - Custom productivity_fn / novelty_fn override
+  - FrontierSelector.revoke() de-authorization (P64a)
 """
 
 import pytest
@@ -126,3 +127,45 @@ def test_custom_novelty_fn_override():
     candidate = FrontierCandidate(id="a", artifact="x", utility=0.5)
     selector = FrontierSelector(novelty_fn=lambda c: -1.0)
     assert selector.score(candidate).novelty == -1.0
+
+
+# ── revoke() de-authorization (P64a) ─────────────────────────────────────────
+
+def test_revoke_sets_flag_and_reason():
+    candidate = FrontierCandidate(id="a", artifact="x", utility=0.5)
+    FrontierSelector.revoke(candidate, "traced to production regression")
+    assert candidate.revoked is True
+    assert candidate.revocation_reason == "traced to production regression"
+
+
+def test_revoked_candidate_excluded_from_rank():
+    high = FrontierCandidate(id="high", artifact="y", utility=0.9)
+    low  = FrontierCandidate(id="low", artifact="x", utility=0.1)
+    FrontierSelector.revoke(high, "regression")
+    selector = FrontierSelector()
+    ranked = selector.rank([high, low])
+    assert [c.id for c, _ in ranked] == ["low"]
+
+
+def test_revoked_candidate_excluded_from_select():
+    only = FrontierCandidate(id="only", artifact="x", utility=0.9)
+    FrontierSelector.revoke(only, "regression")
+    selector = FrontierSelector()
+    assert selector.select([only]) is None
+
+
+def test_revocation_survives_future_utility_growth():
+    """Unlike novelty/productivity, revocation is not overturned by later utility_history."""
+    candidate = FrontierCandidate(id="a", artifact="x", utility=0.9, utility_history=[0.1, 0.9])
+    FrontierSelector.revoke(candidate, "regression")
+    selector = FrontierSelector()
+    assert selector.rank([candidate]) == []
+
+
+def test_unrevoked_candidates_unaffected_by_sibling_revocation():
+    revoked = FrontierCandidate(id="revoked", artifact="x", utility=0.9)
+    kept    = FrontierCandidate(id="kept", artifact="y", utility=0.5)
+    FrontierSelector.revoke(revoked, "regression")
+    selector = FrontierSelector()
+    winner, _ = selector.select([revoked, kept])
+    assert winner.id == "kept"

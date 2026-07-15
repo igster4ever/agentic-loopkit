@@ -18,6 +18,13 @@ Design rules:
       act()     — primary drafting phase
       critique() — evaluation and revision phase
   - No changes to retrieve(), learn(), or follow_up() semantics
+  - Self-confirmation trap: critique() sharing the same model (and often the
+    same prompt context) as act() is a known failure mode — the model can
+    rubber-stamp its own output rather than genuinely evaluate it. Reflexion's
+    critique is same-context by design (see OutcomeExecutor for the isolated-
+    grader alternative), so this risk is structural, not a misuse. Consider a
+    heterogeneous critique model, or OutcomeExecutor's isolated evaluate() if
+    independence matters more than shared context for your use case.
 
 Composition with RALF:
 
@@ -139,6 +146,15 @@ class ReflexionExecutor(RALFExecutor):
         tracing and dashboard display.
 
         LLM calls are appropriate here — critique() is the evaluation phase.
+
+        Self-confirmation trap: if critique() calls the same model as act()
+        (especially with shared prior context), it can rubber-stamp its own
+        draft rather than genuinely evaluate it. This is a known Reflexion
+        limitation, not specific to this implementation — same-model self-
+        critique is the pattern's whole premise. If independence from act()'s
+        reasoning matters more than shared context for your use case, prefer
+        a heterogeneous critique model, or use OutcomeExecutor's isolated
+        evaluate() instead (receives only artifact + rubric, no prior chain).
         """
         ...
 

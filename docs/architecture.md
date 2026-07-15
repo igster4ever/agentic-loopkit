@@ -93,6 +93,43 @@ executor patterns layered on top.
 │                │ (confidence=1.0); gaps fed back to next act() iteration.  │
 │                │ Mirrors Anthropic Managed Agents grader contract.         │
 ├────────────────┼────────────────────────────────────────────────────────────┤
+│ UtilityExecutor│ Standalone generate-and-rank, single pass — not a RALF     │
+│                │ variant (no iterative loop). LLM in generate_candidates()  │
+│                │ and utility_score(); below-threshold rejection short-      │
+│                │ circuits.                                                  │
+├────────────────┼────────────────────────────────────────────────────────────┤
+│ SkillOpt-      │ RALF-based bounded skill optimiser (arXiv:2605.23904). LLM │
+│ Executor       │ in reflect() only; score() deterministic. Validation gate  │
+│                │ (strict >) + rejected-edit buffer + edit_budget cap;       │
+│                │ slow_update()/update_meta_skill() default no-op.           │
+├────────────────┼────────────────────────────────────────────────────────────┤
+│ SelfHarness-   │ OutcomeExecutor subclass. Wires FailurePatternAgent ->     │
+│ Executor       │ SkillOptExecutor (via factory) ->                          │
+│                │ AgentTestHarness.regression_gate(). evaluate()             │
+│                │ deterministic, no LLM. Gate applies only when              │
+│                │ SkillOptExecutor is wrapped this way — see caveat above.   │
+├────────────────┼────────────────────────────────────────────────────────────┤
+│ Frontier-      │ Scoring primitive, not an executor. Ranks a                │
+│ Selector       │ FrontierCandidate pool by utility + productivity + novelty.│
+│                │ revoke() permanently de-authorizes a candidate regardless  │
+│                │ of future utility_history. No LLM.                         │
+├────────────────┼────────────────────────────────────────────────────────────┤
+│ Verification-  │ Plumbing dataclass (criteria, evidence_type,               │
+│ Contract       │ stopping_condition). to_rubric() bridges directly into     │
+│                │ OutcomeExecutor.rubric; from_goal_contract() builds one    │
+│                │ from a compass goal contract.                              │
+├────────────────┼────────────────────────────────────────────────────────────┤
+│ Calibration-   │ Diagnostic dataclass wired into                            │
+│ Record         │ OutcomeExecutor._post_act_hook(). Pairs act()'s self-      │
+│                │ predicted confidence against evaluate()'s satisfied        │
+│                │ verdict; emits system.calibration_recorded per iteration.  │
+│                │ No aggregation.                                            │
+├────────────────┼────────────────────────────────────────────────────────────┤
+│ FailurePattern-│ ProjectionAgent subclass. Clusters error events by         │
+│ Agent          │ FailureSignature(terminal_cause, causal_status,            │
+│                │ agent_mechanism); emits system.failure_pattern_detected.   │
+│                │ Feeds SelfHarnessExecutor.retrieve().                      │
+├────────────────┼────────────────────────────────────────────────────────────┤
 │ Projection-    │ AgentBase subclass. Subscribes to trigger streams; on each │
 │ Agent          │ event loads the full event log for projection_streams and  │
 │                │ calls materialise() (LLM phase in orient()). Emits a      │
@@ -155,6 +192,12 @@ In executor composition: LLM also lives in `think()` (ReActExecutor), `plan()` (
 `critique()` (ReflexionExecutor), `evaluate()` (OutcomeExecutor), and `reflect()` (SkillOptExecutor)
 — never in `execute()`, `execute_step()`, `retrieve()`, or `score()`.
 Note: `SelfHarnessExecutor.evaluate()` is deterministic (calls `regression_gate()`, no LLM).
+Caveat (P64c, audited 2026-07-15): `regression_gate()` gates edits only when `SkillOptExecutor`
+is wrapped by `SelfHarnessExecutor`. Used directly, `SkillOptExecutor.act()` applies accepted
+edits via its own internal selection-split score gate and never calls `regression_gate()` —
+confirmed live in the shipped `examples/compass_skill_opt_demo.py`, which drives
+`SkillOptExecutor` standalone. `regression_gate()` is one available validation path, not a
+structural guarantee for all `SkillOptExecutor` edits.
 
 ---
 
@@ -339,7 +382,7 @@ ISO string, page token, sequence number, or a set of seen IDs.
 
 ---
 
-## Planned extensions
+## Extensions (v2–v8 — all shipped except where marked planned)
 
 ### Executors (see `docs/idioms-adoption-plan.md`)
 
@@ -358,8 +401,9 @@ RALF variants extend `RALFExecutor` via `_post_act_hook()` — never by copying 
 | `FailurePatternAgent` | `agents/failure_pattern.py` | `ProjectionAgent` subclass; clusters error events by `FailureSignature(terminal_cause, causal_status, agent_mechanism)`; emits `system.failure_pattern_detected` | ✅ Built (2026-06-16) |
 | `SelfHarnessExecutor` | `loops/self_harness.py` | `OutcomeExecutor` subclass; wires `FailurePatternAgent` → `SkillOptExecutor` → `AgentTestHarness.regression_gate()` → emit `harness.edit_accepted/rejected`; evaluate() is deterministic — no LLM | ✅ Built (2026-06-16) |
 | `CouncilExecutor` | `agentic_govkit/loops/council.py` | `OutcomeExecutor` subclass (govkit); submits question to N specialist agents in parallel; isolated `evaluate()` for consensus quality gate; emits `governance.council_decision` on consensus or `governance.human_override` on failure | ✅ Built (2026-06-18) |
+| `VerificationContract` | `loops/contract.py` | P55e — dataclass (`criteria`, `evidence_type`, `stopping_condition`); `to_rubric()` bridges into `OutcomeExecutor.rubric` with no lifecycle change; loopkit-side counterpart to compass's `goal_contracts`; `from_goal_contract()` constructs one from a compass contract dict | ✅ Built (2026-07-05) |
 | `CalibrationRecord` | `loops/calibration.py` | P60 — self-prediction calibration; `OutcomeExecutor._post_act_hook()` pairs `act()`'s `result.confidence` against `evaluate()`'s `satisfied` before the confidence overwrite; emits `system.calibration_recorded` per iteration; diagnostic only, no aggregation | ✅ Built (2026-07-09) |
-| `FrontierSelector` | `loops/frontier.py` | P62a — generalises MetaSkill-Evolve's frontier-selection formula (`η₁U + η₂P̂ + η₃N`) into a domain-agnostic ranking primitive over `FrontierCandidate` pools; sibling to `UtilityExecutor` (ranks an existing candidate pool + history, not a fresh generate-and-rank pass); scoring primitive only, no branch-forking pipeline | ✅ Built (2026-07-09) |
+| `FrontierSelector` | `loops/frontier.py` | P62a — generalises MetaSkill-Evolve's frontier-selection formula (`η₁U + η₂P̂ + η₃N`) into a domain-agnostic ranking primitive over `FrontierCandidate` pools; sibling to `UtilityExecutor` (ranks an existing candidate pool + history, not a fresh generate-and-rank pass); scoring primitive only, no branch-forking pipeline; `revoke()` (P64a) permanently de-authorizes a candidate, excluding it from `rank()`/`select()` regardless of future utility_history | ✅ Built (2026-07-09; revoke() 2026-07-15) |
 
 ### EventMeta convention (see `CLAUDE.md`)
 
