@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>agentic-loopkit — Interactive Logical Architecture Infographic</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter, Architects Daughter (for hand-drawn look), Caveat -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Caveat:wght@400;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .handdrawn-font {
+            font-family: 'Architects Daughter', cursive;
+        }
+        
+        .sketchy-text {
+            font-family: 'Caveat', cursive;
+        }
+
+        /* Excalidraw-like Border & Shadow styling */
+        .sketchy-box {
+            border: 2px solid #1e293b;
+            border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+            box-shadow: 4px 4px 0px 0px #1e293b;
+            transition: all 0.2s ease;
+        }
+
+        .sketchy-box-sm {
+            border: 2px solid #1e293b;
+            border-radius: 120px 10px 110px 10px/10px 110px 10px 120px;
+            box-shadow: 2px 2px 0px 0px #1e293b;
+            transition: all 0.15s ease;
+        }
+
+        .sketchy-box:hover {
+            transform: translate(-1px, -1px);
+            box-shadow: 6px 6px 0px 0px #1e293b;
+        }
+
+        .sketchy-box-selected {
+            border: 2.5px solid #2563eb !important;
+            box-shadow: 4px 4px 0px 0px #2563eb !important;
+            transform: translate(-1px, -1px);
+        }
+
+        .sketchy-line {
+            stroke: #1e293b;
+            stroke-width: 2;
+            fill: none;
+            stroke-linecap: round;
+        }
+
+        /* Subtle grid background like Excalidraw */
+        .grid-bg {
+            background-color: #fafaf9;
+            background-image: 
+                linear-gradient(#e7e5e4 1px, transparent 1px),
+                linear-gradient(90deg, #e7e5e4 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* Custom scrollbar to match theme */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border: 2px solid #f1f5f9;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col antialiased text-slate-800">
+
+    <!-- Top Header Bar -->
+    <header class="bg-white border-b-2 border-slate-800 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 z-10 shadow-[0_2px_0_0_rgba(30,41,59,1)]">
+        <div class="flex items-center gap-3">
+            <div class="p-2 bg-yellow-100 border-2 border-slate-800 rounded-lg shadow-[2px_2px_0px_0px_rgba(30,41,59,1)]">
+                <i class="fa-solid fa-pencil text-yellow-600 text-xl"></i>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold uppercase tracking-widest bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded">Architectural Blueprint</span>
+                    <span class="text-xs font-bold uppercase tracking-widest bg-blue-100 text-blue-800 border border-blue-300 px-2 py-0.5 rounded">Local-First</span>
+                </div>
+                <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    agentic-loopkit <span class="handdrawn-font text-xl text-blue-600">logical-architecture</span>
+                </h1>
+            </div>
+        </div>
+        
+        <!-- Tab Navigation (Excalidraw Styled buttons) -->
+        <nav class="flex items-center gap-2 flex-wrap">
+            <button onclick="switchTab('blueprint')" id="tab-btn-blueprint" class="sketchy-box-sm px-4 py-2 text-sm font-bold bg-amber-100 text-slate-800 hover:bg-amber-200 flex items-center gap-2">
+                <i class="fa-solid fa-map"></i> Architecture Canvas
+            </button>
+            <button onclick="switchTab('ooda')" id="tab-btn-ooda" class="sketchy-box-sm px-4 py-2 text-sm font-bold bg-white text-slate-800 hover:bg-slate-100 flex items-center gap-2">
+                <i class="fa-solid fa-rotate"></i> OODA Simulator
+            </button>
+            <button onclick="switchTab('ralf')" id="tab-btn-ralf" class="sketchy-box-sm px-4 py-2 text-sm font-bold bg-white text-slate-800 hover:bg-slate-100 flex items-center gap-2">
+                <i class="fa-solid fa-arrows-spin"></i> RALF Loop Engine
+            </button>
+            <button onclick="switchTab('traceability')" id="tab-btn-traceability" class="sketchy-box-sm px-4 py-2 text-sm font-bold bg-white text-slate-800 hover:bg-slate-100 flex items-center gap-2">
+                <i class="fa-solid fa-route"></i> Event Tracing
+            </button>
+            <button onclick="switchTab('lclm')" id="tab-btn-lclm" class="sketchy-box-sm px-4 py-2 text-sm font-bold bg-white text-slate-800 hover:bg-slate-100 flex items-center gap-2">
+                <i class="fa-solid fa-compress"></i> Event Store & LCLM
+            </button>
+            <button onclick="switchTab('governance')" id="tab-btn-governance" class="sketchy-box-sm px-4 py-2 text-sm font-bold bg-white text-slate-800 hover:bg-slate-100 flex items-center gap-2">
+                <i class="fa-solid fa-shield-halved"></i> Governance Lab
+            </button>
+        </nav>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 flex overflow-hidden relative">
+        
+        <!-- TAB 1: BLUEPRINT CANVAS (Excalidraw Diagram + Inspector Sidebar) -->
+        <section id="tab-blueprint" class="flex-1 flex flex-col lg:flex-row overflow-hidden w-full">
+            <!-- Left Side: Interactive Excalidraw Canvas Area -->
+            <div class="flex-1 overflow-y-auto p-4 lg:p-6 grid-bg relative flex flex-col justify-between">
+                
+                <div class="absolute top-4 left-4 bg-white/90 backdrop-blur-sm border-2 border-slate-800 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm flex items-center gap-2 pointer-events-none z-10">
+                    <i class="fa-solid fa-mouse-pointer text-blue-500 animate-pulse"></i>
+                    <span>Interactive Canvas: Click components to inspect details</span>
+                </div>
+
+                <!-- Hand drawn Diagram Container -->
+                <div class="max-w-4xl mx-auto w-full my-auto space-y-12 py-10 z-0">
+                    
+                    <!-- External Systems -->
+                    <div class="flex flex-col items-center">
+                        <div class="text-xs uppercase tracking-widest font-black sketchy-text text-slate-500 mb-2">External World</div>
+                        <div class="flex justify-center gap-6 flex-wrap">
+                            <div class="sketchy-box px-6 py-3 bg-red-50 text-center relative max-w-[150px]">
+                                <i class="fa-solid fa-square-check text-red-500 text-lg mb-1"></i>
+                                <div class="font-bold text-xs">ClickUp</div>
+                                <span class="absolute -bottom-3 -right-2 bg-slate-800 text-white rounded text-[10px] px-1 font-mono">Adapter</span>
+                            </div>
+                            <div class="sketchy-box px-6 py-3 bg-indigo-50 text-center relative max-w-[150px]">
+                                <i class="fa-brands fa-slack text-indigo-500 text-lg mb-1"></i>
+                                <div class="font-bold text-xs">Slack</div>
+                                <span class="absolute -bottom-3 -right-2 bg-slate-800 text-white rounded text-[10px] px-1 font-mono">Adapter</span>
+                            </div>
+                            <div class="sketchy-box px-6 py-3 bg-zinc-100 text-center relative max-w-[150px]">
+                                <i class="fa-brands fa-git-alt text-orange-500 text-lg mb-1"></i>
+                                <div class="font-bold text-xs">Local Git</div>
+                                <span class="absolute -bottom-3 -right-2 bg-slate-800 text-white rounded text-[10px] px-1 font-mono">Adapter</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Flow Arrow (SVG Representation) -->
+                    <div class="flex justify-center -my-6 h-12">
+                        <svg class="w-12 h-12" viewBox="0 0 50 50">
+                            <path d="M25,0 C20,15 30,35 25,45" class="sketchy-line" />
+                            <path d="M20,38 L25,45 L30,38" class="sketchy-line" />
+                        </svg>
+                    </div>
+
+                    <!-- Polling Adapter Engine -->
+                    <div class="flex justify-center">
+                        <div onclick="inspectComponent('PollingAdapter')" id="node-PollingAdapter" class="sketchy-box bg-yellow-50 p-6 max-w-md w-full cursor-pointer hover:scale-105 transform transition duration-150 relative">
+                            <div class="absolute -top-3 left-4 bg-yellow-400 border-2 border-slate-800 text-slate-900 font-bold px-2 py-0.5 text-xs rounded shadow-sm">
+                                adapter.py
+                            </div>
+                            <h3 class="font-black text-lg flex items-center gap-2">
+                                <i class="fa-solid fa-clock-rotate-left text-yellow-600"></i> PollingAdapter(s)
+                            </h3>
+                            <p class="text-xs text-slate-600 mt-2">
+                                Tick-driven adapter loop. Extracts data, deduplicates against local cursor logs, and safely publishes raw typed Events.
+                            </p>
+                            <div class="mt-3 flex gap-2">
+                                <span class="bg-yellow-100 border border-yellow-300 text-[10px] font-bold px-1.5 py-0.5 rounded text-slate-700">No Reasoning</span>
+                                <span class="bg-yellow-100 border border-yellow-300 text-[10px] font-bold px-1.5 py-0.5 rounded text-slate-700">Deduplication</span>
+                                <span class="bg-yellow-100 border border-yellow-300 text-[10px] font-bold px-1.5 py-0.5 rounded text-slate-700">Tick() Driven</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Flow Arrow (SVG Representation) -->
+                    <div class="flex justify-center -my-6 h-12">
+                        <svg class="w-12 h-12" viewBox="0 0 50 50">
+                            <path d="M25,0 C20,15 30,35 25,45" class="sketchy-line" />
+                            <path d="M20,38 L25,45 L30,38" class="sketchy-line" />
+                        </svg>
+                    </div>
+
+                    <!-- Core EventBus and Store ("Cheap Kafka") -->
+                    <div class="flex flex-col md:flex-row justify-center gap-8 items-stretch">
+                        
+                        <!-- EventBus Coordination Box -->
+                        <div onclick="inspectComponent('EventBus')" id="node-EventBus" class="sketchy-box bg-blue-50 p-6 flex-1 cursor-pointer hover:scale-105 transform transition duration-150 relative">
+                            <div class="absolute -top-3 left-4 bg-blue-400 border-2 border-slate-800 text-slate-900 font-bold px-2 py-0.5 text-xs rounded shadow-sm">
+                                bus.py
+                            </div>
+                            <h3 class="font-black text-lg flex items-center gap-2">
+                                <i class="fa-solid fa-circle-nodes text-blue-600"></i> EventBus &amp; Router
+                            </h3>
+                            <p class="text-xs text-slate-600 mt-2">
+                                The engine core. Persists messages before async route dispatch. Ensures no silent event losses on crash. Supported streams can fanout to subscribers or wildcard subscribers.
+                            </p>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <span class="bg-blue-100 border border-blue-300 text-[10px] font-bold px-1.5 py-0.5 rounded text-slate-700">Persist-Before-Fanout</span>
+                                <span class="bg-blue-100 border border-blue-300 text-[10px] font-bold px-1.5 py-0.5 rounded text-slate-700">Wildcards ("*")</span>
+                            </div>
+                        </div>
+
+                        <!-- JSONL Event Store Box -->
+                        <div onclick="inspectComponent('EventStore')" id="node-EventStore" class="sketchy-box bg-emerald-50 p-6 flex-1 cursor-pointer hover:scale-105 transform transition duration-150 relative">
+                            <div class="absolute -top-3 left-4 bg-emerald-400 border-2 border-slate-800 text-slate-900 font-bold px-2 py-0.5 text-xs rounded shadow-sm">
+                                ~/.cache/&lt;app&gt;/
+                            </div>
+                            <h3 class="font-black text-lg flex items-center gap-2">
+                                <i class="fa-solid fa-file-invoice text-emerald-600"></i> JSONL Event Store
+                            </h3>
+                            <p class="text-xs text-slate-600 mt-2">
+                                Append-only local storage engine. Generates unique files per stream. Fully replayable for offline dev loops and crash state restoration. Built-in compression (LCLM).
+                            </p>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <span class="bg-emerald-100 border border-emerald-300 text-[10px] font-bold px-1.5 py-0.5 rounded text-slate-700">JSONL Logs</span>
+                                <span class="bg-emerald-100 border border-emerald-300 text-[10px] font-bold px-1.5 py-0.5 rounded text-slate-700">Replayable</span>
+                                <span class="bg-emerald-100 border border-emerald-300 text-[10px] font-bold px-1.5 py-0.5 rounded text-slate-700">O(1) Headlines</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Flow Arrow to Executors/Agents (Splitting Branch) -->
+                    <div class="flex justify-center -my-6 h-12">
+                        <svg class="w-48 h-12" viewBox="0 0 200 50">
+                            <!-- Left branch -->
+                            <path d="M100,0 C80,15 40,25 35,45" class="sketchy-line" />
+                            <path d="M30,38 L35,45 L41,39" class="sketchy-line" />
+                            <!-- Right branch -->
+                            <path d="M100,0 C120,15 160,25 165,45" class="sketchy-line" />
+                            <path d="M159,39 L165,45 L170,38" class="sketchy-line" />
+                        </svg>
+                    </div>
+
+                    <!-- Bottom Tier: Reactive Agents vs Executors -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+                        
+                        <!-- Reactive Agent Category -->
+                        <div onclick="inspectComponent('AgentBase')" id="node-AgentBase" class="sketchy-box bg-purple-50 p-6 cursor-pointer hover:scale-105 transform transition duration-150 relative">
+                            <div class="absolute -top-3 left-4 bg-purple-400 border-2 border-slate-800 text-slate-900 font-bold px-2 py-0.5 text-xs rounded shadow-sm">
+                                agents/base.py
+                            </div>
+                            <h3 class="font-black text-lg flex items-center gap-2">
+                                <i class="fa-solid fa-brain text-purple-600"></i> AgentBase (OODA)
+                            </h3>
+                            <p class="text-xs text-slate-600 mt-2">
+                                Reactive agent class implementing strict 4-phase OODA loop (Observe, Orient, Decide, Act). Enforces <b>LLM-in-orient-only</b> design constraints to prevent reasoning leaks. Includes state serialization (CoALA model).
+                            </p>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <span class="bg-purple-100 border border-purple-300 text-[10px] font-bold px-1.5 py-0.5 rounded text-slate-700">OODA Reactive</span>
+                                <span class="bg-purple-100 border border-purple-300 text-[10px] font-bold px-1.5 py-0.5 rounded text-slate-700">CoALA State</span>
+                                <span class="bg-purple-100 border border-purple-300 text-[10px] font-bold px-1.5 py-0.5 rounded text-slate-700">Orient() LLM</span>
+                            </div>
+                        </div>
+
+                        <!-- Bounded Executor Category -->
+                        <div onclick="inspectComponent('RALFExecutor')" id="node-RALFExecutor" class="sketchy-box bg-pink-50 p-6 cursor-pointer hover:scale-105 transform transition duration-150 relative">
+                            <div class="absolute -top-3 left-4 bg-pink-400 border-2 border-slate-800 text-slate-900 font-bold px-2 py-0.5 text-xs rounded shadow-sm">
+                                loops/base.py
+                            </div>
+                            <h3 class="font-black text-lg flex items-center gap-2">
+                                <i class="fa-solid fa-gears text-pink-600"></i> Bounded Executors
+                            </h3>
+                            <p class="text-xs text-slate-600 mt-2">
+                                Orchestrated loop controllers triggered by single events. Bounded by max iterations, strict confidence limits (&gt; 0.40), and crash-safe persistent execution pipelines.
+                            </p>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <span class="bg-pink-100 border border-pink-300 text-[10px] font-bold px-1.5 py-0.5 rounded text-slate-700">RALF Loops</span>
+                                <span class="bg-pink-100 border border-pink-300 text-[10px] font-bold px-1.5 py-0.5 rounded text-slate-700">ReAct Tools</span>
+                                <span class="bg-pink-100 border border-pink-300 text-[10px] font-bold px-1.5 py-0.5 rounded text-slate-700">Reflexion / Outcome</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Footer with credits/version -->
+                <div class="text-center text-xs text-slate-400 sketchy-text text-lg mt-6">
+                    Hand-drawn representation of agentic-loopkit architecture &bull; 2026 Stable Spec v8
+                </div>
+            </div>
+
+            <!-- Right Side: Component Details Inspector (Interactive Content Panel) -->
+            <div class="w-full lg:w-96 bg-white border-t-2 lg:border-t-0 lg:border-l-2 border-slate-800 flex flex-col h-1/2 lg:h-full z-10 shadow-[0_-2px_0_0_rgba(30,41,59,1)] lg:shadow-[-2px_0_0_0_rgba(30,41,59,1)]">
+                <div class="p-4 bg-slate-50 border-b-2 border-slate-800 flex items-center justify-between">
+                    <h2 class="font-black text-sm uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                        <i class="fa-solid fa-magnifying-glass text-blue-500"></i> Component Inspector
+                    </h2>
+                    <span class="text-xs bg-slate-200 text-slate-700 font-mono px-2 py-0.5 rounded" id="inspector-filepath">None</span>
+                </div>
+                
+                <!-- Inspector Content (Dynamic) -->
+                <div id="inspector-body" class="flex-1 overflow-y-auto p-4 space-y-4">
+                    <!-- Default State -->
+                    <div class="h-full flex flex-col items-center justify-center text-center text-slate-400 py-20">
+                        <i class="fa-solid fa-shapes text-5xl mb-4 text-slate-300 animate-bounce"></i>
+                        <p class="font-bold text-sm">No component selected</p>
+                        <p class="text-xs max-w-[200px] mt-1">Click on any container in the architecture diagram to load its logical blueprint.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: OODA LOOP SIMULATOR -->
+        <section id="tab-ooda" class="hidden flex-1 overflow-y-auto p-6 grid-bg">
+            <div class="max-w-5xl mx-auto space-y-6">
+                <!-- Explainer Card -->
+                <div class="sketchy-box bg-purple-50 p-6">
+                    <h2 class="text-xl font-black mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-arrows-spin text-purple-600"></i> OODA Reactive Loop Simulator
+                    </h2>
+                    <p class="text-sm text-slate-600">
+                        AgentBase executes this exact 4-phase sequence on every subscribed event. The core rule is <b>LLM in orient() only</b>. If any phase returns <code>None</code>, the loop short-circuits instantly.
+                    </p>
+                </div>
+
+                <!-- Simulation Playground Layout -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    
+                    <!-- Left: Controller Config (lg:col-5) -->
+                    <div class="lg:col-span-5 sketchy-box bg-white p-6 space-y-4">
+                        <h3 class="font-bold text-sm uppercase tracking-wide text-slate-500 border-b pb-2">1. Configure Incoming Event</h3>
+                        
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Event Type &amp; Stream</label>
+                            <select id="ooda-event-type" class="w-full border-2 border-slate-800 rounded px-2.5 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="updateOodaSamplePayload()">
+                                <option value="clickup.task_updated">clickup.task_updated (Subscription Stream)</option>
+                                <option value="slack.message_posted">slack.message_posted (Subscription Stream)</option>
+                                <option value="unregistered.garbage">unregistered.garbage (Unknown Stream)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Simulate Loop Logic Switches</label>
+                            <div class="space-y-2 mt-2">
+                                <label class="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                                    <input type="checkbox" id="ooda-filter-pass" checked class="w-4 h-4 text-purple-600 border-2 border-slate-800 rounded focus:ring-purple-500">
+                                    <span>observe(): pass filter checks</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                                    <input type="checkbox" id="ooda-llm-respond" checked class="w-4 h-4 text-purple-600 border-2 border-slate-800 rounded focus:ring-purple-500">
+                                    <span>orient(): LLM successfully reasons</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                                    <input type="checkbox" id="ooda-confidence-pass" checked class="w-4 h-4 text-purple-600 border-2 border-slate-800 rounded focus:ring-purple-500">
+                                    <span>decide(): confidence &gt; threshold</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <button onclick="runOodaSimulation()" class="w-full sketchy-box-sm bg-purple-600 text-white font-bold py-3 text-sm hover:bg-purple-700 active:translate-y-0.5 flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-play"></i> Trigger Reactive OODA Loop
+                        </button>
+                    </div>
+
+                    <!-- Right: Trace Timeline (lg:col-7) -->
+                    <div class="lg:col-span-7 space-y-4">
+                        <h3 class="font-black text-sm uppercase tracking-wide text-slate-500">2. Live Trace Logs</h3>
+
+                        <!-- Phase 1: OBSERVE -->
+                        <div id="ooda-step-observe" class="sketchy-box-sm bg-white p-4 transition-all duration-300 opacity-40">
+                            <div class="flex items-center justify-between">
+                                <h4 class="font-bold text-sm flex items-center gap-2 text-slate-700">
+                                    <span class="w-6 h-6 flex items-center justify-center rounded-full bg-slate-200 text-xs font-mono font-bold text-slate-800">1</span>
+                                    observe() <span class="text-xs font-normal text-slate-400">(Deterministic)</span>
+                                </h4>
+                                <span id="ooda-step-observe-badge" class="text-xs font-semibold px-2 py-0.5 rounded border border-slate-300 bg-slate-100">Idle</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-2" id="ooda-step-observe-desc">Awaiting incoming event trigger...</p>
+                        </div>
+
+                        <!-- Phase 2: ORIENT -->
+                        <div id="ooda-step-orient" class="sketchy-box-sm bg-white p-4 transition-all duration-300 opacity-40">
+                            <div class="flex items-center justify-between">
+                                <h4 class="font-bold text-sm flex items-center gap-2 text-slate-700">
+                                    <span class="w-6 h-6 flex items-center justify-center rounded-full bg-slate-200 text-xs font-mono font-bold text-slate-800">2</span>
+                                    orient() <span class="text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 px-1 rounded"><i class="fa-solid fa-brain"></i> LLM Call Here</span>
+                                </h4>
+                                <span id="ooda-step-orient-badge" class="text-xs font-semibold px-2 py-0.5 rounded border border-slate-300 bg-slate-100">Idle</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-2" id="ooda-step-orient-desc">Will run LLM reasoning engine to parse objectives.</p>
+                        </div>
+
+                        <!-- Phase 3: DECIDE -->
+                        <div id="ooda-step-decide" class="sketchy-box-sm bg-white p-4 transition-all duration-300 opacity-40">
+                            <div class="flex items-center justify-between">
+                                <h4 class="font-bold text-sm flex items-center gap-2 text-slate-700">
+                                    <span class="w-6 h-6 flex items-center justify-center rounded-full bg-slate-200 text-xs font-mono font-bold text-slate-800">3</span>
+                                    decide() <span class="text-xs font-normal text-slate-400">(Deterministic)</span>
+                                </h4>
+                                <span id="ooda-step-decide-badge" class="text-xs font-semibold px-2 py-0.5 rounded border border-slate-300 bg-slate-100">Idle</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-2" id="ooda-step-decide-desc">Check confidence thresholds &amp; policy rules.</p>
+                        </div>
+
+                        <!-- Phase 4: ACT -->
+                        <div id="ooda-step-act" class="sketchy-box-sm bg-white p-4 transition-all duration-300 opacity-40">
+                            <div class="flex items-center justify-between">
+                                <h4 class="font-bold text-sm flex items-center gap-2 text-slate-700">
+                                    <span class="w-6 h-6 flex items-center justify-center rounded-full bg-slate-200 text-xs font-mono font-bold text-slate-800">4</span>
+                                    act() <span class="text-xs font-normal text-slate-400">(Deterministic)</span>
+                                </h4>
+                                <span id="ooda-step-act-badge" class="text-xs font-semibold px-2 py-0.5 rounded border border-slate-300 bg-slate-100">Idle</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-2" id="ooda-step-act-desc">Apply actions and emit downstream events to the bus.</p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: RALF LOOP ENGINE SIMULATOR -->
+        <section id="tab-ralf" class="hidden flex-1 overflow-y-auto p-6 grid-bg">
+            <div class="max-w-5xl mx-auto space-y-6">
+                <!-- Explainer Card -->
+                <div class="sketchy-box bg-pink-50 p-6">
+                    <h2 class="text-xl font-black mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-gears text-pink-600"></i> Bounded RALF Loop Simulator
+                    </h2>
+                    <p class="text-sm text-slate-600">
+                        The RALF (Retrieve-Act-Learn-Forward) executor handles stateful, multi-step tasks. Crucially: <b>Confidence levels under 0.40 trigger an automatic hard rejection</b> inside the engine loop, safeguarding against broken reasoning steps.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    <!-- Left: Control Deck -->
+                    <div class="lg:col-span-5 sketchy-box bg-white p-6 space-y-4">
+                        <h3 class="font-bold text-sm uppercase tracking-wide text-slate-500 border-b pb-2">Loop Parameters</h3>
+                        
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Max Iterations Limit</label>
+                            <input type="number" id="ralf-max-iter" value="3" min="1" max="10" class="w-full border-2 border-slate-800 rounded px-2.5 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-pink-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1 flex justify-between">
+                                <span>LLM Self-Confidence (for Act phase)</span>
+                                <span id="ralf-conf-val" class="font-mono text-pink-600">0.85</span>
+                            </label>
+                            <input type="range" id="ralf-confidence" min="0" max="100" value="85" class="w-full accent-pink-600 cursor-pointer" oninput="document.getElementById('ralf-conf-val').innerText = (this.value / 100).toFixed(2)">
+                            <div class="flex justify-between text-[10px] text-slate-400 font-mono mt-1">
+                                <span>0.00 (Reject)</span>
+                                <span>0.40 (Critical Gate)</span>
+                                <span>1.00 (Perfect)</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Termination Success Trigger</label>
+                            <select id="ralf-term-trigger" class="w-full border-2 border-slate-800 rounded px-2.5 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-pink-500">
+                                <option value="iter_1">Succeeds on Iteration 1</option>
+                                <option value="iter_2">Succeeds on Iteration 2</option>
+                                <option value="limit">Succeeds on final iteration cap</option>
+                                <option value="never">Never succeeds (timeout error)</option>
+                            </select>
+                        </div>
+
+                        <button onclick="runRalfSimulation()" class="w-full sketchy-box-sm bg-pink-600 text-white font-bold py-3 text-sm hover:bg-pink-700 active:translate-y-0.5 flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-play"></i> Initialize &amp; Execute RALF Engine
+                        </button>
+                    </div>
+
+                    <!-- Right: Execution Engine Graphic -->
+                    <div class="lg:col-span-7 space-y-4">
+                        <h3 class="font-black text-sm uppercase tracking-wide text-slate-500">Engine Execution Trace</h3>
+                        
+                        <div id="ralf-trace-container" class="space-y-3">
+                            <div class="h-40 flex flex-col items-center justify-center text-slate-400 bg-white/50 border-2 border-dashed border-slate-300 rounded-lg">
+                                <i class="fa-solid fa-terminal text-3xl mb-2"></i>
+                                <p class="text-xs">Trigger the executor loop to trace state persistence step-by-step.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: EVENT TRACEABILITY GRAPH -->
+        <section id="tab-traceability" class="hidden flex-1 overflow-y-auto p-6 grid-bg">
+            <div class="max-w-5xl mx-auto space-y-6">
+                <div class="sketchy-box bg-blue-50 p-6">
+                    <h2 class="text-xl font-black mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-route text-blue-600"></i> Event Traceability &amp; Causal Chains
+                    </h2>
+                    <p class="text-sm text-slate-600">
+                        Every task triggered via the EventBus maintains a strong causal link using shared <code>correlation_id</code> parameters. Downstream events auto-increment their <code>delegation_depth</code> via the <code>caused()</code> helper, providing absolute lineage audit trails.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Event Creation Form -->
+                    <div class="sketchy-box bg-white p-6 space-y-4">
+                        <h3 class="font-bold text-sm uppercase tracking-wider text-slate-500 border-b pb-2">Generate Roots &amp; Children</h3>
+                        
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Causal Workflow Target</label>
+                            <input type="text" id="trace-corr-id" value="CU-ADR-901" class="w-full border-2 border-slate-800 rounded px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Generate Event Type</label>
+                            <select id="trace-event-type" class="w-full border-2 border-slate-800 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="clickup.task_updated">clickup.task_updated (Adapter root)</option>
+                                <option value="command.analyse_task">command.analyse_task (Analysis hook)</option>
+                                <option value="adr.draft_created">adr.draft_created (Doc output)</option>
+                                <option value="governance.audit_flagged">governance.audit_flagged (Alert)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Trust Level Selection</label>
+                            <select id="trace-trust-level" class="w-full border-2 border-slate-800 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="HIGH">HIGH (Enforcer, human)</option>
+                                <option value="MEDIUM" selected>MEDIUM (Standard adapter)</option>
+                                <option value="LOW">LOW (Unchecked community feed)</option>
+                                <option value="UNTRUSTED">UNTRUSTED (Anonymous / Unsigned)</option>
+                            </select>
+                        </div>
+
+                        <button onclick="injectTraceEvent()" class="w-full sketchy-box-sm bg-blue-600 text-white font-bold py-2.5 text-xs hover:bg-blue-700 flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-plus"></i> Append Event to Log
+                        </button>
+                        <button onclick="clearTraceLogs()" class="w-full sketchy-box-sm bg-slate-100 text-slate-700 border-slate-300 font-bold py-2 text-xs hover:bg-slate-200">
+                            Clear Current View
+                        </button>
+                    </div>
+
+                    <!-- Interactive Tree View (cols-span-2) -->
+                    <div class="md:col-span-2 sketchy-box bg-white p-6 space-y-4">
+                        <div class="flex items-center justify-between border-b pb-2">
+                            <h3 class="font-bold text-sm uppercase tracking-wider text-slate-500">Replayed Causal Graph</h3>
+                            <span class="text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-mono" id="trace-corr-id-badge">Correlation: CU-ADR-901</span>
+                        </div>
+
+                        <!-- Graph Rendering Area -->
+                        <div class="min-h-[250px] relative flex flex-col space-y-4 justify-start" id="trace-graph-canvas">
+                            <!-- Events get dynamically generated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 5: LCLM EVENT STORE AND COMPRESSION -->
+        <section id="tab-lclm" class="hidden flex-1 overflow-y-auto p-6 grid-bg">
+            <div class="max-w-5xl mx-auto space-y-6">
+                <!-- Explainer Card -->
+                <div class="sketchy-box bg-emerald-50 p-6">
+                    <h2 class="text-xl font-black mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-compress text-emerald-600"></i> Event Store &amp; LCLM Storage Compression
+                    </h2>
+                    <p class="text-sm text-slate-600">
+                        Loopkit writes a parallel <code>headlines-&lt;stream&gt;.jsonl</code> file. Instead of loading heavy payloads over wire, agents skim cheap one-line headlines first and selectively expand only the full event files on demand.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Simulated Filesystem View -->
+                    <div class="sketchy-box bg-white p-6 space-y-4">
+                        <h3 class="font-bold text-sm uppercase tracking-wider text-slate-500 border-b pb-2">
+                            <i class="fa-solid fa-folder-open text-amber-500"></i> Filesystem Directory
+                        </h3>
+                        
+                        <div class="font-mono text-xs space-y-2 bg-slate-900 text-slate-200 p-4 rounded-lg shadow-inner">
+                            <div class="text-emerald-400">~/.cache/agentic-app/</div>
+                            <div class="pl-4 flex items-center justify-between">
+                                <span>├── events-clickup.jsonl <span class="text-slate-500">(1.4 MB)</span></span>
+                                <span class="text-slate-400 text-[10px]">Full Events</span>
+                            </div>
+                            <div class="pl-4 text-emerald-300 flex items-center justify-between">
+                                <span>├── headlines-clickup.jsonl <span class="text-slate-500">(22 KB)</span></span>
+                                <span class="bg-emerald-950 px-1 rounded text-[9px] text-emerald-400 font-bold">LCLM Compression</span>
+                            </div>
+                            <div class="pl-4 flex items-center justify-between">
+                                <span>├── events-slack.jsonl <span class="text-slate-500">(420 KB)</span></span>
+                                <span>Full Events</span>
+                            </div>
+                            <div class="pl-4 text-emerald-300 flex items-center justify-between">
+                                <span>├── headlines-slack.jsonl <span class="text-slate-500">(8 KB)</span></span>
+                                <span class="bg-emerald-950 px-1 rounded text-[9px] text-emerald-400 font-bold">LCLM Compression</span>
+                            </div>
+                            <div class="pl-4">
+                                <span>└── cursor-clickup.json <span class="text-slate-500">(Adapter Offset)</span></span>
+                            </div>
+                        </div>
+
+                        <!-- Buttons to trigger skimming -->
+                        <div class="space-y-2 pt-2">
+                            <button onclick="runSkimmingSim()" class="w-full sketchy-box-sm bg-emerald-600 text-white font-bold py-2 text-sm hover:bg-emerald-700 flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-bolt"></i> Run Headline Skimming (Low Token Cost)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Live Compression Monitor -->
+                    <div class="sketchy-box bg-white p-6 space-y-4">
+                        <h3 class="font-bold text-sm uppercase tracking-wider text-slate-500 border-b pb-2">
+                            <i class="fa-solid fa-microchip text-blue-500"></i> Processing Statistics &amp; Inspection
+                        </h3>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-slate-50 border-2 border-slate-200 p-3 rounded-lg text-center">
+                                <div class="text-[10px] uppercase font-bold text-slate-400">Standard Retrieval</div>
+                                <div class="text-xl font-black text-rose-500 font-mono mt-1">112,500 <span class="text-xs">tkns</span></div>
+                                <div class="text-[9px] text-slate-400">Loads entire event payload log</div>
+                            </div>
+                            <div class="bg-emerald-50 border-2 border-emerald-200 p-3 rounded-lg text-center">
+                                <div class="text-[10px] uppercase font-bold text-emerald-700">LCLM Skimming</div>
+                                <div class="text-xl font-black text-emerald-600 font-mono mt-1">1,450 <span class="text-xs">tkns</span></div>
+                                <div class="text-[9px] text-emerald-600 font-bold">98.7% Storage &amp; Token savings!</div>
+                            </div>
+                        </div>
+
+                        <!-- Dynamic output from execution -->
+                        <div class="bg-slate-50 border border-slate-200 p-3 rounded h-40 overflow-y-auto font-mono text-xs text-slate-600 space-y-2" id="lclm-output">
+                            <div class="text-slate-400">&lt;Awaiting simulation start...&gt;</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 6: GOVERNANCE LAB -->
+        <section id="tab-governance" class="hidden flex-1 overflow-y-auto p-6 grid-bg">
+            <div class="max-w-5xl mx-auto space-y-6">
+                <!-- Explainer Card -->
+                <div class="sketchy-box bg-rose-50 p-6">
+                    <h2 class="text-xl font-black mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-shield-halved text-rose-600"></i> Phase A &amp; Phase B Governance Lab
+                    </h2>
+                    <p class="text-sm text-slate-600">
+                        Phase A uses the <code>AuditAgent</code> to observe loop metrics. When thresholds break, Phase B enforcement engine (<code>KillSwitchAgent</code>) immediately intervenes. Choose policies below to test incoming events against local limits.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                    <!-- Left: Rules Configuration Engine -->
+                    <div class="md:col-span-5 sketchy-box bg-white p-6 space-y-4">
+                        <h3 class="font-bold text-sm uppercase tracking-wide text-slate-500 border-b pb-2">Policy Configuration</h3>
+                        
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Max Delegation Depth (Phase A)</label>
+                            <input type="number" id="gov-depth-limit" value="4" min="1" max="10" class="w-full border-2 border-slate-800 rounded px-2.5 py-1.5 text-xs font-semibold focus:ring-rose-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Triggering Event Depth</label>
+                            <input type="number" id="gov-event-depth" value="5" min="1" max="10" class="w-full border-2 border-slate-800 rounded px-2.5 py-1.5 text-xs font-semibold focus:ring-rose-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Phase B Intercept Action</label>
+                            <select id="gov-killswitch-policy" class="w-full border-2 border-slate-800 rounded px-2.5 py-1.5 text-xs font-semibold">
+                                <option value="halt_correlation">halt_correlation (Drop Chain completely)</option>
+                                <option value="quarantine_source">quarantine_source (Flag emitting adapter)</option>
+                                <option value="emit_human_override">emit_human_override (Hold for escalation)</option>
+                            </select>
+                        </div>
+
+                        <button onclick="testGovernancePipeline()" class="w-full sketchy-box-sm bg-rose-600 text-white font-bold py-3 text-sm hover:bg-rose-700 flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-shield-halved"></i> Run Enforcement Test
+                        </button>
+                    </div>
+
+                    <!-- Right: Audit Terminal Outputs -->
+                    <div class="md:col-span-7 sketchy-box bg-slate-900 text-slate-100 p-6 space-y-4 shadow-inner flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between border-b border-slate-700 pb-2">
+                                <h3 class="font-mono text-xs font-bold uppercase tracking-wider text-slate-400">Audit &amp; Enforcement Logs</h3>
+                                <span class="text-[10px] bg-rose-950 text-rose-300 font-mono font-bold px-2 py-0.5 rounded border border-rose-800">ENFORCEMENT: ACTIVE</span>
+                            </div>
+
+                            <div class="mt-4 font-mono text-xs space-y-2 h-60 overflow-y-auto" id="gov-logs-output">
+                                <div class="text-slate-500">// Configure parameter scopes and press run pipeline...</div>
+                            </div>
+                        </div>
+
+                        <!-- System status board -->
+                        <div class="border-t border-slate-700 pt-3 flex justify-between items-center text-[11px] font-mono text-slate-400">
+                            <span>AuditAgent (Phase A): <span class="text-emerald-400">ONLINE</span></span>
+                            <span>KillSwitchAgent (Phase B): <span class="text-emerald-400">ONLINE</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Data containing all components from the architecture specification
+        const componentBlueprints = {
+            'PollingAdapter': {
+                name: 'PollingAdapter',
+                filepath: 'adapters/clickup.py, slack.py',
+                role: 'Deduplicates & bridges external inputs to raw Event formats.',
+                details: [
+                    'Extracts data periodically from target interfaces.',
+                    'Deduplicates and filters using unique source parameters & stored local offsets.',
+                    'Emits clean Event payloads. Does not contain local logic reasoning steps.'
+                ],
+                trust: 'Inherits trust specifications from target source context.',
+                code: `class ClickUpAdapter(PollingAdapter):
+    def tick(self):
+        # Fetch, check cursor offset, publish events
+        events, new_cursor = self.poll(self.cursor)
+        for event in events:
+            self.bus.publish(event)`
+            },
+            'EventBus': {
+                name: 'EventBus',
+                filepath: 'core/bus.py',
+                role: 'Local coordinator engine implementing Persist-Before-Fanout.',
+                details: [
+                    'Handles message serialization safely.',
+                    'Locks append-only stores prior to emitting signals to any subscribers.',
+                    'Fully offline compatible. Perfect for mock-driven unit test systems.'
+                ],
+                trust: 'Absolute local boundary truth anchor.',
+                code: `class EventBus:
+    def publish(self, event: Event):
+        # 1. Append to local JSONL
+        self.store.append(event)
+        # 2. Router routing rules dispatch
+        self.router.dispatch(event)`
+            },
+            'EventStore': {
+                name: 'JSONL Event Store',
+                filepath: 'events/store.py',
+                role: 'Append-only storage structure partitioned by stream handles.',
+                details: [
+                    'Maintains directories under ~/.cache/<app> paths.',
+                    'Stores events sequentially to disk, offering full system recovery.',
+                    'Integrates with LCLM summaries to reduce LLM skimming costs.'
+                ],
+                trust: 'Read-only archive log files.',
+                code: `def append_event(store_path: Path, event: Event):
+    with open(store_path / f"events-{event.stream}.jsonl", "a") as f:
+        f.write(event.model_dump_json() + "\\n")`
+            },
+            'AgentBase': {
+                name: 'AgentBase (OODA)',
+                filepath: 'agents/base.py',
+                role: 'OODA pattern base class with strict reasoning limits.',
+                details: [
+                    'Funnels events strictly: Observe -> Orient -> Decide -> Act.',
+                    'Restricts LLM access to the Orient phase to minimize reasoning leakage.',
+                    'Manages CoALA state models (semantic, episodic, procedural).'
+                ],
+                trust: 'Variable trust based on source delegation models.',
+                code: `class AgentBase:
+    def on_event(self, event: Event):
+        ctx = self.observe(event)
+        if ctx:
+            orientation = self.orient(ctx) # LLM here
+            action = self.decide(orientation)
+            self.act(action)`
+            },
+            'RALFExecutor': {
+                name: 'RALF Bounded Executor',
+                filepath: 'loops/base.py',
+                role: 'Stateful, finite iteration loop supervisor.',
+                details: [
+                    'Processes tasks recursively: Retrieve -> Act -> Learn -> Forward.',
+                    'Terminates processing on complete status or loops cap exhaustion.',
+                    'Enforces standard minimum confidence filters (Confidence >= 0.40).'
+                ],
+                trust: 'High structural predictability guarantees.',
+                code: `class RALFExecutor:
+    def run(self, event: Event):
+        ctx = self.retrieve(event)
+        for _ in range(self.max_iterations):
+            result = self.act(ctx) # LLM call
+            self.learn(result)
+            if result.confidence < 0.40:
+                 raise HardRejectionError()
+            if result.is_terminal:
+                 break`
+            }
+        };
+
+        // Switch tabs dynamically
+        function switchTab(tabId) {
+            // Hide all tabs
+            ['blueprint', 'ooda', 'ralf', 'traceability', 'lclm', 'governance'].forEach(t => {
+                document.getElementById(`tab-${t}`).classList.add('hidden');
+                document.getElementById(`tab-btn-${t}`).classList.remove('bg-amber-100', 'bg-slate-100', 'sketchy-box-selected');
+                document.getElementById(`tab-btn-${t}`).classList.add('bg-white');
+            });
+
+            // Show active
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+            
+            // Apply Excalidraw styled active status classes
+            if (tabId === 'blueprint') {
+                activeBtn.classList.add('bg-amber-100', 'sketchy-box-selected');
+            } else if (tabId === 'ooda') {
+                activeBtn.classList.add('bg-purple-100', 'sketchy-box-selected');
+            } else if (tabId === 'ralf') {
+                activeBtn.classList.add('bg-pink-100', 'sketchy-box-selected');
+            } else if (tabId === 'traceability') {
+                activeBtn.classList.add('bg-blue-100', 'sketchy-box-selected');
+            } else if (tabId === 'lclm') {
+                activeBtn.classList.add('bg-emerald-100', 'sketchy-box-selected');
+            } else if (tabId === 'governance') {
+                activeBtn.classList.add('bg-rose-100', 'sketchy-box-selected');
+            }
+        }
+
+        // Component Inspector
+        function inspectComponent(componentKey) {
+            // Remove previous selections
+            Object.keys(componentBlueprints).forEach(key => {
+                const el = document.getElementById(`node-${key}`);
+                if (el) el.classList.remove('sketchy-box-selected');
+            });
+
+            // Highlight node
+            const nodeEl = document.getElementById(`node-${componentKey}`);
+            if (nodeEl) nodeEl.classList.add('sketchy-box-selected');
+
+            // Set content
+            const data = componentBlueprints[componentKey];
+            document.getElementById('inspector-filepath').innerText = data.filepath;
+
+            let detailsHtml = data.details.map(d => `<li class="flex items-start gap-2 text-xs text-slate-600"><i class="fa-solid fa-chevron-right text-blue-500 mt-1 text-[10px]"></i> <span>${d}</span></li>`).join('');
+
+            document.getElementById('inspector-body').innerHTML = `
+                <div class="space-y-4">
+                    <h3 class="font-black text-xl text-slate-900 border-b pb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-cube text-blue-600"></i> ${data.name}
+                    </h3>
+                    
+                    <div>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">System Role</span>
+                        <p class="text-xs text-slate-600 font-semibold mt-1">${data.role}</p>
+                    </div>
+
+                    <div>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Core Characteristics</span>
+                        <ul class="space-y-2 mt-2">${detailsHtml}</ul>
+                    </div>
+
+                    <div class="bg-slate-50 border-2 border-slate-800 p-3 rounded-lg relative">
+                        <span class="absolute -top-3 left-4 bg-slate-800 text-white text-[9px] px-1.5 font-bold uppercase tracking-wider">Default Trust Rating</span>
+                        <p class="text-xs font-mono font-bold mt-1 text-slate-700">${data.trust}</p>
+                    </div>
+
+                    <div>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Architecture Pseudocode</span>
+                        <pre class="bg-slate-900 text-emerald-400 text-[11px] p-3 rounded font-mono overflow-x-auto border border-slate-800 max-h-48 shadow-inner">${data.code}</pre>
+                    </div>
+                </div>
+            `;
+        }
+
+        // OODA Simulator State & Actions
+        function runOodaSimulation() {
+            const eventType = document.getElementById('ooda-event-type').value;
+            const filterPass = document.getElementById('ooda-filter-pass').checked;
+            const llmRespond = document.getElementById('ooda-llm-respond').checked;
+            const confPass = document.getElementById('ooda-confidence-pass').checked;
+
+            // Reset trace containers
+            const steps = ['observe', 'orient', 'decide', 'act'];
+            steps.forEach(s => {
+                document.getElementById(`ooda-step-${s}`).className = 'sketchy-box-sm bg-white p-4 transition-all duration-300 opacity-40';
+                document.getElementById(`ooda-step-${s}-badge`).className = 'text-xs font-semibold px-2 py-0.5 rounded border border-slate-300 bg-slate-100';
+                document.getElementById(`ooda-step-${s}-badge`).innerText = 'Skipped';
+            });
+
+            let currentStepIndex = 0;
+
+            function runStep() {
+                if (currentStepIndex >= steps.length) return;
+                const step = steps[currentStepIndex];
+                const box = document.getElementById(`ooda-step-${step}`);
+                const badge = document.getElementById(`ooda-step-${step}-badge`);
+                const desc = document.getElementById(`ooda-step-${step}-desc`);
+
+                box.className = 'sketchy-box-sm bg-white p-4 transition-all duration-300 opacity-100 border-l-4 border-blue-500 scale-[1.02] shadow';
+                badge.innerText = 'Evaluating';
+                badge.className = 'text-xs font-semibold px-2 py-0.5 rounded border border-blue-300 bg-blue-50 text-blue-700';
+
+                setTimeout(() => {
+                    if (step === 'observe') {
+                        if (eventType === 'unregistered.garbage') {
+                            badge.innerText = 'Short-Circuit';
+                            badge.className = 'text-xs font-semibold px-2 py-0.5 rounded border border-rose-300 bg-rose-50 text-rose-700';
+                            desc.innerHTML = `<strong>Blocked:</strong> Event type belongs to unregistered stream. Process halted.`;
+                            return; // short circuit
+                        }
+                        if (!filterPass) {
+                            badge.innerText = 'Short-Circuit';
+                            badge.className = 'text-xs font-semibold px-2 py-0.5 rounded border border-rose-300 bg-rose-50 text-rose-700';
+                            desc.innerHTML = `<strong>Blocked:</strong> Filter criteria rejected matching payloads. Process halted.`;
+                            return; // short circuit
+                        }
+                        badge.innerText = 'Pass';
+                        badge.className = 'text-xs font-semibold px-2 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-emerald-700';
+                        desc.innerHTML = `Event registered successfully on stream <code>${eventType.split('.')[0]}</code>. Gathers execution scope context.`;
+                        currentStepIndex++;
+                        setTimeout(runStep, 800);
+                    }
+                    else if (step === 'orient') {
+                        if (!llmRespond) {
+                            badge.innerText = 'Short-Circuit';
+                            badge.className = 'text-xs font-semibold px-2 py-0.5 rounded border border-rose-300 bg-rose-50 text-rose-700';
+                            desc.innerHTML = `<strong>Reasoning Error:</strong> LLM orient() phase returns <code>None</code>. Loop terminated.`;
+                            return;
+                        }
+                        badge.innerText = 'Pass';
+                        badge.className = 'text-xs font-semibold px-2 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-emerald-700';
+                        desc.innerHTML = `Reasoning parse completed. Generated objective: <i>"Optimize task structure context updates."</i>`;
+                        currentStepIndex++;
+                        setTimeout(runStep, 800);
+                    }
+                    else if (step === 'decide') {
+                        if (!confPass) {
+                            badge.innerText = 'Short-Circuit';
+                            badge.className = 'text-xs font-semibold px-2 py-0.5 rounded border border-rose-300 bg-rose-50 text-rose-700';
+                            desc.innerHTML = `<strong>Blocked:</strong> Self-declared confidence score falls below system thresholds. Terminated.`;
+                            return;
+                        }
+                        badge.innerText = 'Pass';
+                        badge.className = 'text-xs font-semibold px-2 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-emerald-700';
+                        desc.innerHTML = `Policy matching verifies high structural alignment scores. Authorizes execution.`;
+                        currentStepIndex++;
+                        setTimeout(runStep, 800);
+                    }
+                    else if (step === 'act') {
+                        badge.innerText = 'Emitted';
+                        badge.className = 'text-xs font-semibold px-2 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-emerald-700';
+                        desc.innerHTML = `Successfully processed target actions. Downstream target events dispatched back to local bus buffers!`;
+                    }
+                }, 1000);
+            }
+
+            runStep();
+        }
+
+        function updateOodaSamplePayload() {
+            // Auto preset switches to match standard scenarios
+            const eventType = document.getElementById('ooda-event-type').value;
+            if (eventType === 'unregistered.garbage') {
+                document.getElementById('ooda-filter-pass').checked = false;
+            } else {
+                document.getElementById('ooda-filter-pass').checked = true;
+            }
+        }
+
+        // RALF Engine Logic Simulator
+        function runRalfSimulation() {
+            const maxIter = parseInt(document.getElementById('ralf-max-iter').value) || 3;
+            const confidence = parseFloat(document.getElementById('ralf-confidence').value) / 100;
+            const termTrigger = document.getElementById('ralf-term-trigger').value;
+            const container = document.getElementById('ralf-trace-container');
+
+            container.innerHTML = `<div class="p-3 bg-slate-900 text-emerald-400 font-mono text-xs rounded border border-slate-800 space-y-2" id="ralf-engine-output"></div>`;
+            const output = document.getElementById('ralf-engine-output');
+
+            function log(txt, color = 'text-emerald-400') {
+                output.innerHTML += `<div class="${color}">[RALF Engine] ${txt}</div>`;
+                container.scrollTop = container.scrollHeight;
+            }
+
+            log('Initializing bounded RALF task framework context...', 'text-slate-400');
+            
+            setTimeout(() => {
+                log('Phase 1: Running retrieve(). Assembly context deterministically...', 'text-slate-200');
+                log('-> No LLM calls allowed. Loading parallel event stores & priority items...', 'text-slate-400');
+            }, 600);
+
+            let currentIter = 1;
+            
+            function runIter() {
+                if (currentIter > maxIter) {
+                    log(`[CRITICAL] Hard boundary max_iterations cap reached (${maxIter}). Termination state error triggered!`, 'text-rose-500');
+                    log('Exiting with status: error. Triggering learn() rollback state updates...', 'text-rose-400');
+                    return;
+                }
+
+                setTimeout(() => {
+                    log(`Iteration ${currentIter}/${maxIter} matching initialized...`, 'text-pink-400 font-bold');
+                    log(`-> Calling act(context, prior_result). Running reasoning engine LLM...`, 'text-slate-300');
+                    
+                    setTimeout(() => {
+                        log(`-> LLM output received with confidence verification score: ${confidence.toFixed(2)}`, 'text-blue-300');
+                        
+                        if (confidence < 0.40) {
+                            log(`[CRITICAL BLOCKED] Confidence score ${confidence.toFixed(2)} is lower than RALF absolute guardrail threshold limit (0.40)!`, 'text-rose-600 font-bold bg-rose-950 p-2 rounded');
+                            log(`-> Forcing automatic rejection to safeguard pipeline execution flows. Terminating.`, 'text-rose-400');
+                            return; // halt
+                        }
+
+                        // Verify completion status matching selected criteria
+                        let terminalReached = false;
+                        if (termTrigger === 'iter_1' && currentIter === 1) terminalReached = true;
+                        if (termTrigger === 'iter_2' && currentIter === 2) terminalReached = true;
+                        if (termTrigger === 'limit' && currentIter === maxIter) terminalReached = true;
+
+                        log(`-> Run checkpoint logging - calling learn(event, result) to persist intermediate values safely to disk...`, 'text-yellow-400');
+
+                        if (terminalReached) {
+                            log(`-> Checkpoint evaluation verified: status="complete". Exiting iterations.`, 'text-emerald-400 font-bold');
+                            log(`-> Executing downstream callbacks: follow_up(event, result)`, 'text-slate-400');
+                            log(`-> Loop successful. Downstream events published back to EventBus coordinator!`, 'text-emerald-300 font-bold');
+                        } else {
+                            log(`-> Checkpoint evaluation verified: status="in_progress". Prepping next iterations...`, 'text-slate-400');
+                            currentIter++;
+                            runIter();
+                        }
+
+                    }, 1000);
+
+                }, 800);
+            }
+
+            setTimeout(runIter, 1200);
+        }
+
+        // Event Traceability Graph Engine
+        let traceHistory = [
+            { id: 'ev-001', type: 'clickup.task_updated', stream: 'clickup', depth: 0, trust: 'MEDIUM', parent: null },
+            { id: 'ev-002', type: 'command.analyse_task', stream: 'command', depth: 1, trust: 'MEDIUM', parent: 'ev-001' },
+            { id: 'ev-003', type: 'adr.draft_created', stream: 'adr', depth: 2, trust: 'MEDIUM', parent: 'ev-002' }
+        ];
+
+        function renderTraceGraph() {
+            const canvas = document.getElementById('trace-graph-canvas');
+            canvas.innerHTML = '';
+
+            traceHistory.forEach((ev, idx) => {
+                const isRoot = !ev.parent;
+                const node = document.createElement('div');
+                node.className = 'sketchy-box-sm bg-slate-50 p-3 hover:bg-white flex items-center justify-between relative transition-all duration-150';
+                
+                // Add left padding margin offsets depending on depth tracking to draw a structured tree
+                node.style.marginLeft = `${ev.depth * 30}px`;
+
+                // Background gradient tags depending on trust level specs
+                let trustBg = 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                if (ev.trust === 'HIGH') trustBg = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                if (ev.trust === 'LOW') trustBg = 'bg-orange-100 text-orange-800 border-orange-200';
+                if (ev.trust === 'UNTRUSTED') trustBg = 'bg-rose-100 text-rose-800 border-rose-200';
+
+                node.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        ${!isRoot ? `<i class="fa-solid fa-arrow-turn-up rotate-90 text-slate-400 mr-1"></i>` : `<i class="fa-solid fa-house-laptop text-slate-500"></i>`}
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="font-mono text-xs font-bold text-slate-800">${ev.type}</span>
+                                <span class="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border ${trustBg}">${ev.trust}</span>
+                            </div>
+                            <div class="text-[10px] text-slate-400 font-mono mt-1">
+                                id: ${ev.id} &bull; causation_id: ${ev.parent || 'None'}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-right">
+                        <span class="text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-mono">
+                            depth: ${ev.depth}
+                        </span>
+                    </div>
+                `;
+
+                canvas.appendChild(node);
+            });
+        }
+
+        function injectTraceEvent() {
+            const type = document.getElementById('trace-event-type').value;
+            const trust = document.getElementById('trace-trust-level').value;
+            const corr = document.getElementById('trace-corr-id').value;
+
+            // Resolve parent tracking
+            const parent = traceHistory.length > 0 ? traceHistory[traceHistory.length - 1].id : null;
+            const depth = traceHistory.length > 0 ? traceHistory[traceHistory.length - 1].depth + 1 : 0;
+            const id = 'ev-' + Math.floor(Math.random() * 900 + 100);
+
+            traceHistory.push({
+                id,
+                type,
+                stream: type.split('.')[0],
+                depth,
+                trust,
+                parent
+            });
+
+            document.getElementById('trace-corr-id-badge').innerText = `Correlation: ${corr}`;
+            renderTraceGraph();
+        }
+
+        function clearTraceLogs() {
+            traceHistory = [];
+            renderTraceGraph();
+        }
+
+        // Initialize trace elements on load
+        renderTraceGraph();
+
+        // LCLM Compression Simulation Actions
+        function runSkimmingSim() {
+            const output = document.getElementById('lclm-output');
+            output.innerHTML = '';
+
+            function logLine(txt, color = 'text-emerald-400') {
+                output.innerHTML += `<div class="${color}">${txt}</div>`;
+                output.scrollTop = output.scrollHeight;
+            }
+
+            logLine('Connecting and executing compact local logs replayer...', 'text-slate-400');
+            
+            setTimeout(() => {
+                logLine('1. Calling load_headlines(stream="clickup", limit=500)', 'text-slate-200');
+                logLine('   [IO Engine] Skimming cheap, compacted parallel headlines log...', 'text-slate-500');
+            }, 600);
+
+            setTimeout(() => {
+                logLine('   [SUCCESS] Received 3 sequential event summaries (size &lt; 1KB total!):', 'text-emerald-500 font-bold');
+                logLine('     - CHUNK #102: "Task changed status to IN_PROGRESS" (id: ev-801)');
+                logLine('     - CHUNK #103: "Assigned target update owner to Agent" (id: ev-802)');
+                logLine('     - CHUNK #104: "Added verification contract specs context" (id: ev-803)');
+            }, 1400);
+
+            setTimeout(() => {
+                logLine('2. Requesting full expansion by chunk ID for selective auditing...', 'text-slate-200');
+                logLine('   Calling expand_event(stream="clickup", chunk_id=103)...', 'text-slate-300');
+            }, 2400);
+
+            setTimeout(() => {
+                logLine('   [SUCCESS] O(1) exact payload recovered directly from parallel disk sector:', 'text-emerald-500 font-bold');
+                logLine('   { "event_id": "ev-802", "payload": { "assignee": "system", "auth": true, "raw_context_data": "..." } }', 'text-yellow-400 text-[10px]');
+            }, 3200);
+        }
+
+        // Phase A & B Governance Simulation engine
+        function testGovernancePipeline() {
+            const depthLimit = parseInt(document.getElementById('gov-depth-limit').value) || 4;
+            const eventDepth = parseInt(document.getElementById('gov-event-depth').value) || 5;
+            const action = document.getElementById('gov-killswitch-policy').value;
+            const output = document.getElementById('gov-logs-output');
+
+            output.innerHTML = '';
+
+            function logGov(txt, lvl = 'INFO') {
+                let color = 'text-slate-300';
+                if (lvl === 'WARN') color = 'text-yellow-400 font-semibold';
+                if (lvl === 'CRITICAL') color = 'text-rose-500 font-black bg-rose-950 p-1.5 rounded';
+                if (lvl === 'SUCCESS') color = 'text-emerald-400 font-bold';
+
+                output.innerHTML += `<div>[${lvl}] ${txt}</div>`;
+                output.scrollTop = output.scrollHeight;
+            }
+
+            logGov('AuditAgent (Phase A) pipeline started watching EventBus feeds...', 'INFO');
+            
+            setTimeout(() => {
+                logGov(`Incoming event intercepted: Stream: clickup, causation_id="ev-802", correlation_id="CU-ADR-901"`, 'INFO');
+                logGov(`Validating metadata criteria: event delegation_depth is ${eventDepth}. (Limit parameter is ${depthLimit})`, 'INFO');
+            }, 800);
+
+            setTimeout(() => {
+                if (eventDepth > depthLimit) {
+                    logGov(`[BREACH DETECTED] delegation_depth ${eventDepth} exceeds max allowed threshold scope of ${depthLimit}!`, 'CRITICAL');
+                    logGov(`AuditAgent emitting target event: governance.depth_exceeded at TrustLevel.HIGH`, 'WARN');
+                    
+                    // Trigger Phase B intercept actions
+                    setTimeout(() => {
+                        logGov(`KillSwitchAgent (Phase B) intercept processing triggered for event: governance.depth_exceeded`, 'INFO');
+                        logGov(`Evaluating active intervention policies...`, 'INFO');
+                        
+                        setTimeout(() => {
+                            if (action === 'halt_correlation') {
+                                logGov(`[ACTION TAKEN] halt_correlation pipeline executed!`, 'SUCCESS');
+                                logGov(`Correlation chain "CU-ADR-901" instantly blacklisted. Downstream tasks dropping in-flight steps.`, 'WARN');
+                                logGov(`Emitted enforcer target event: governance.halt at TrustLevel.HIGH`, 'SUCCESS');
+                            } else if (action === 'quarantine_source') {
+                                logGov(`[ACTION TAKEN] quarantine_source pipeline executed!`, 'SUCCESS');
+                                logGov(`Source adapter ClickUpAdapter flagged as QUARANTINED. All subsequent inputs will be ignored.`, 'WARN');
+                                logGov(`Emitted enforcer target event: governance.quarantine at TrustLevel.HIGH`, 'SUCCESS');
+                            } else if (action === 'emit_human_override') {
+                                logGov(`[ACTION TAKEN] emit_human_override pipeline executed!`, 'SUCCESS');
+                                logGov(`Workflow execution paused. Enqueued to operators review registry queues.`, 'WARN');
+                                logGov(`Emitted enforcer target event: governance.human_override at TrustLevel.HIGH`, 'SUCCESS');
+                            }
+                        }, 1000);
+
+                    }, 1000);
+
+                } else {
+                    logGov('Validation passed. Event depth matches safety criteria. No alerts triggered.', 'SUCCESS');
+                }
+            }, 1800);
+        }
+    </script>
+</body>
+</html>
