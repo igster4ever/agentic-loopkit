@@ -1,9 +1,103 @@
 import json
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 from agentic_loopkit.bus import EventBus
-from agentic_loopkit.adapters.base import PollingAdapter
+from agentic_loopkit.adapters.base import PollingAdapter, paginate_get
 from agentic_loopkit.events.models import Event
 from agentic_loopkit.events.store import load_events
+
+
+def make_response(status=200, json_data=None):
+    resp = AsyncMock()
+    resp.status = status
+    resp.raise_for_status = MagicMock()
+    resp.json = AsyncMock(return_value=json_data or {})
+    resp.__aenter__ = AsyncMock(return_value=resp)
+    resp.__aexit__ = AsyncMock(return_value=False)
+    return resp
+
+
+# ── paginate_get ───────────────────────────────────────────────────────────────
+
+async def test_paginate_get_single_page():
+    session = MagicMock()
+    session.get = MagicMock(return_value=make_response(json_data={"items": [1, 2]}))
+
+    results = await paginate_get(
+        session, "http://x", {}, {},
+        log_prefix="test", rate_limit_label="page",
+        extract_batch=lambda d: d["items"],
+        advance=lambda d, params: None,
+    )
+    assert results == [1, 2]
+
+
+async def test_paginate_get_follows_advance_across_pages():
+    session = MagicMock()
+    session.get = MagicMock(side_effect=[
+        make_response(json_data={"items": [1], "more": True}),
+        make_response(json_data={"items": [2], "more": False}),
+    ])
+
+    def advance(data, params):
+        return {"page": "2"} if data["more"] else None
+
+    results = await paginate_get(
+        session, "http://x", {}, {"page": "1"},
+        log_prefix="test", rate_limit_label="page",
+        extract_batch=lambda d: d["items"],
+        advance=advance,
+    )
+    assert results == [1, 2]
+
+
+async def test_paginate_get_stops_on_429_keeping_partial_results():
+    session = MagicMock()
+    session.get = MagicMock(side_effect=[
+        make_response(json_data={"items": [1], "more": True}),
+        make_response(status=429),
+    ])
+
+    results = await paginate_get(
+        session, "http://x", {}, {},
+        log_prefix="test", rate_limit_label="page",
+        extract_batch=lambda d: d["items"],
+        advance=lambda d, params: {"page": "2"} if d.get("more") else None,
+    )
+    assert results == [1]
+
+
+async def test_paginate_get_stops_when_is_ok_returns_false():
+    session = MagicMock()
+    session.get = MagicMock(return_value=make_response(json_data={"ok": False, "items": [1]}))
+
+    results = await paginate_get(
+        session, "http://x", {}, {},
+        log_prefix="test", rate_limit_label="page",
+        extract_batch=lambda d: d["items"],
+        advance=lambda d, params: None,
+        is_ok=lambda d: d["ok"],
+    )
+    assert results == []
+
+
+async def test_paginate_get_invokes_on_page_callback_per_page():
+    session = MagicMock()
+    session.get = MagicMock(side_effect=[
+        make_response(json_data={"items": [1], "more": True}),
+        make_response(json_data={"items": [2], "more": False}),
+    ])
+    seen_batches = []
+
+    await paginate_get(
+        session, "http://x", {}, {},
+        log_prefix="test", rate_limit_label="page",
+        extract_batch=lambda d: d["items"],
+        advance=lambda d, params: {"page": "2"} if d["more"] else None,
+        on_page=lambda batch, data: seen_batches.append(list(batch)),
+    )
+    assert seen_batches == [[1], [2]]
 
 
 def make_event() -> Event:

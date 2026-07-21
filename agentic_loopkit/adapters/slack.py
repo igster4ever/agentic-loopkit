@@ -48,7 +48,7 @@ from typing import Any, Optional
 
 from ..events.models import Event
 from ..utils.time import now_unix
-from .base import PollingAdapter
+from .base import PollingAdapter, paginate_get
 
 log = logging.getLogger("agentic_loopkit.adapter.slack")
 
@@ -164,47 +164,44 @@ class SlackAdapter(PollingAdapter):
             "Authorization": f"Bearer {self._bot_token}",
             "Content-Type":  "application/json",
         }
-        messages: list[dict] = []
-        next_cursor: str = ""
+        initial_params = {
+            "channel":   channel_id,
+            "oldest":    oldest,
+            "limit":     str(self._page_size),
+            "inclusive": "false",
+        }
         latest_ts = oldest
 
-        while True:
-            params: dict[str, Any] = {
-                "channel": channel_id,
-                "oldest":  oldest,
-                "limit":   str(self._page_size),
-                "inclusive": "false",
-            }
-            if next_cursor:
-                params["cursor"] = next_cursor
-
-            async with session.get(url, headers=headers, params=params) as resp:
-                if resp.status == 429:
-                    log.warning(
-                        "[slack] rate limited on channel %s — stopping pagination",
-                        channel_id,
-                    )
-                    break
-                resp.raise_for_status()
-                data = await resp.json()
-
+        def is_ok(data: dict) -> bool:
             if not data.get("ok"):
-                error = data.get("error", "unknown")
-                log.warning("[slack] API error for channel %s: %s", channel_id, error)
-                break
+                log.warning(
+                    "[slack] API error for channel %s: %s",
+                    channel_id, data.get("error", "unknown"),
+                )
+                return False
+            return True
 
-            batch = data.get("messages", [])
-            messages.extend(batch)
-
+        def on_page(batch: list[dict], data: dict) -> None:
+            nonlocal latest_ts
             if batch:
                 # Slack returns newest-first; batch[0].ts is the most recent
                 latest_ts = batch[0].get("ts", latest_ts)
 
+        def advance(data: dict, params: dict) -> Optional[dict]:
             meta        = data.get("response_metadata", {})
             next_cursor = meta.get("next_cursor", "")
             if not next_cursor or not data.get("has_more", False):
-                break
+                return None
+            return {**params, "cursor": next_cursor}
 
+        messages = await paginate_get(
+            session, url, headers, initial_params,
+            log_prefix="slack", rate_limit_label=f"channel {channel_id}",
+            extract_batch=lambda data: data.get("messages", []),
+            advance=advance,
+            is_ok=is_ok,
+            on_page=on_page,
+        )
         return messages, latest_ts
 
     # ── Event mapping ──────────────────────────────────────────────────────────

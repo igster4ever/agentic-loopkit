@@ -51,6 +51,20 @@ class HarnessEventType(StrEnum):
     CANDIDATE_EVAL = "harness.candidate_eval"
 
 
+class LoopType(StrEnum):
+    """Valid values for EventMeta.loop_type — one per executor/loop shape."""
+    OODA         = "ooda"
+    RALF         = "ralf"
+    REACT        = "react"
+    PLAN         = "plan"
+    REFLEXION    = "reflexion"
+    OUTCOME      = "outcome"
+    CONFLICT     = "conflict"
+    COUNCIL      = "council"
+    SKILLOPT     = "skillopt"
+    SELF_HARNESS = "self_harness"
+
+
 class TrustLevel(StrEnum):
     """
     Declared trust level for an event's source.
@@ -98,12 +112,16 @@ class EventMeta:
     Read back via ``event.meta()`` on any ``Event`` instance.
     """
 
-    phase:      Optional[str]   = None  # "observe"|"orient"|"decide"|"act"|"think"|"execute"|"retrieve"|"learn"
-    loop_type:  Optional[str]   = None  # "ooda"|"ralf"|"react"|"plan"|"reflexion"|"outcome"|"conflict"|"skillopt"|"self_harness"
-    iteration:  Optional[int]   = None  # step/iteration number within the loop
-    confidence: Optional[float] = None  # 0.0–1.0
-    context:    Optional[str]   = None  # human-readable reasoning for dashboard Context tab
-    tags:       list[str]       = field(default_factory=list)
+    phase:      Optional[str]      = None  # "observe"|"orient"|"decide"|"act"|"think"|"execute"|"retrieve"|"learn"
+    loop_type:  Optional[LoopType] = None  # see LoopType
+    iteration:  Optional[int]      = None  # step/iteration number within the loop
+    confidence: Optional[float]    = None  # 0.0–1.0
+    context:    Optional[str]      = None  # human-readable reasoning for dashboard Context tab
+    tags:       list[str]          = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if self.loop_type is not None:
+            self.loop_type = LoopType(self.loop_type)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise to dict, omitting None values and empty tag lists."""

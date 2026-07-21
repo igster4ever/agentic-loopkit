@@ -47,7 +47,7 @@ from typing import Any, Optional
 
 from ..events.models import Event
 from ..utils.time import ms_to_iso, now_ms
-from .base import PollingAdapter
+from .base import PollingAdapter, paginate_get
 
 log = logging.getLogger("agentic_loopkit.adapter.clickup")
 
@@ -163,32 +163,25 @@ class ClickUpAdapter(PollingAdapter):
         Session is owned by _fetch_all and shared across all list requests in a tick.
         """
         headers = {"Authorization": self._api_token}
-        tasks: list[dict] = []
-        page  = 0
+        initial_params = {
+            "date_updated_gt": str(since_ms),
+            "order_by":        "updated",
+            "page":            "0",
+            "page_size":       str(self._page_size),
+            "include_closed":  "true",
+        }
 
-        while True:
-            params = {
-                "date_updated_gt": str(since_ms),
-                "order_by":        "updated",
-                "page":            str(page),
-                "page_size":       str(self._page_size),
-                "include_closed":  "true",
-            }
-            async with session.get(url, headers=headers, params=params) as resp:
-                if resp.status == 429:
-                    log.warning("[clickup] rate limited on %s — stopping pagination", label)
-                    break
-                resp.raise_for_status()
-                data = await resp.json()
+        def advance(data: dict, params: dict) -> Optional[dict]:
+            if data.get("last_page", True) or not data.get("tasks", []):
+                return None
+            return {**params, "page": str(int(params["page"]) + 1)}
 
-            batch = data.get("tasks", [])
-            tasks.extend(batch)
-
-            if data.get("last_page", True) or not batch:
-                break
-            page += 1
-
-        return tasks
+        return await paginate_get(
+            session, url, headers, initial_params,
+            log_prefix="clickup", rate_limit_label=label,
+            extract_batch=lambda data: data.get("tasks", []),
+            advance=advance,
+        )
 
     # ── Event mapping ──────────────────────────────────────────────────────────
 

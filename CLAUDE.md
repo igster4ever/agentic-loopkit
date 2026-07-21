@@ -89,8 +89,9 @@ agentic_govkit/                  # Governance layer (pip install agentic-loopkit
 │   ├── learning.py          # GovernanceLearningAgent + PolicyRecommendation — rolling window → analyse() → policy_recommendation
 │   └── community_trust.py   # CommunityTrustLearner — concrete GovernanceLearningAgent; UNTRUSTED→LOW trust graduation
 ├── loops/
-│   ├── conflict.py          # ConflictResolutionExecutor — OutcomeExecutor subclass; dispute mediation
-│   └── council.py           # CouncilExecutor + CouncilOpinion — fan-out to N specialists → weighted consensus → governance.council_decision
+│   ├── consensus.py         # ConsensusOutcomeExecutor — shared follow_up() for consensus-style governance executors
+│   ├── conflict.py          # ConflictResolutionExecutor — extends ConsensusOutcomeExecutor; dispute mediation
+│   └── council.py           # CouncilExecutor + CouncilOpinion — extends ConsensusOutcomeExecutor; fan-out to N specialists → weighted consensus → governance.council_decision
 └── events/
     └── models.py            # GovernanceEventType StrEnum (governance.* stream) incl. COUNCIL_DECISION
 
@@ -153,7 +154,7 @@ payload = {
 }
 ```
 
-Fields: `phase`, `loop_type` (`"ooda"|"ralf"|"react"|"plan"|"reflexion"|"outcome"`), `iteration`, `confidence`, `context`, `tags`.
+Fields: `phase`, `loop_type` (`LoopType` StrEnum — `ooda`|`ralf`|`react`|`plan`|`reflexion`|`outcome`|`conflict`|`council`|`skillopt`|`self_harness`; invalid values raise `ValueError`), `iteration`, `confidence`, `context`, `tags`.
 All fields optional. `to_dict()` omits None fields and empty tag lists.
 Read back via `event.meta()` — returns the `_meta` dict or `None` if absent.
 The dashboard renders `payload["_meta"]["context"]` in the Context tab.

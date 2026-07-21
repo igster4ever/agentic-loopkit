@@ -62,7 +62,7 @@ export interface AdapterInfo {
 // EventMeta — optional framework metadata from payload["_meta"]
 export interface EventMeta {
   phase?:      string;
-  loop_type?:  'ooda' | 'ralf' | 'react' | 'plan' | 'reflexion' | 'outcome';
+  loop_type?:  'ooda' | 'ralf' | 'react' | 'plan' | 'reflexion' | 'outcome' | 'conflict' | 'council' | 'skillopt' | 'self_harness';
   iteration?:  number;
   confidence?: number;
   context?:    string;

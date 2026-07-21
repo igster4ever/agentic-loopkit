@@ -34,13 +34,14 @@ import logging
 from abc import abstractmethod
 from typing import Any, Optional
 
-from agentic_loopkit import OutcomeExecutor, RALFResult, Event
+from agentic_loopkit import RALFResult, Event
 from agentic_govkit.events.models import GovernanceEventType
+from agentic_govkit.loops.consensus import ConsensusOutcomeExecutor
 
 log = logging.getLogger("agentic_govkit.conflict")
 
 
-class ConflictResolutionExecutor(OutcomeExecutor):
+class ConflictResolutionExecutor(ConsensusOutcomeExecutor):
     """
     Mediates between two competing agent positions on the same entity.
 
@@ -70,6 +71,8 @@ class ConflictResolutionExecutor(OutcomeExecutor):
     """
 
     max_iterations: int = 3
+    success_event_type = GovernanceEventType.DISPUTE_RESOLVED
+    success_payload_key = "synthesis"
 
     @property
     @abstractmethod
@@ -121,33 +124,6 @@ class ConflictResolutionExecutor(OutcomeExecutor):
         """
         ...
 
-    async def follow_up(self, event: Event, result: RALFResult) -> Optional[Event]:
-        """
-        Emit governance.dispute_resolved on consensus,
-        governance.human_override on exhaustion or confidence rejection.
-        """
-        if result.status == "complete":
-            log.info("[%s] dispute resolved — correlation_id=%s", self.name, event.correlation_id)
-            return event.caused(
-                GovernanceEventType.DISPUTE_RESOLVED,
-                self.name,
-                {
-                    "synthesis":      result.output,
-                    "correlation_id": event.correlation_id,
-                },
-            )
-
-        log.warning(
-            "[%s] dispute unresolved (status=%s) — escalating to human_override",
-            self.name, result.status,
-        )
-        return event.caused(
-            GovernanceEventType.HUMAN_OVERRIDE,
-            self.name,
-            {
-                "reason":         f"ConflictResolutionExecutor exhausted without consensus (status={result.status})",
-                "last_output":    result.output,
-                "correlation_id": event.correlation_id,
-                "status":         result.status,
-            },
-        )
+    # follow_up() is inherited from ConsensusOutcomeExecutor — emits
+    # governance.dispute_resolved on consensus, governance.human_override
+    # on exhaustion or confidence rejection. Override for custom enrichment.

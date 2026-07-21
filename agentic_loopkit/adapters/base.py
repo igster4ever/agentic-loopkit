@@ -43,7 +43,7 @@ import logging
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any, Callable, Optional, TYPE_CHECKING
 
 from ..events.models import Event, SystemEventType
 from ..utils.time import iso_format
@@ -52,6 +52,68 @@ if TYPE_CHECKING:
     from ..bus import EventBus
 
 log = logging.getLogger("agentic_loopkit.adapter")
+
+
+async def paginate_get(
+    session: Any,
+    url: str,
+    headers: dict,
+    initial_params: dict,
+    *,
+    log_prefix: str,
+    rate_limit_label: str,
+    extract_batch: Callable[[dict], list],
+    advance: Callable[[dict, dict], Optional[dict]],
+    is_ok: Optional[Callable[[dict], bool]] = None,
+    on_page: Optional[Callable[[list, dict], None]] = None,
+) -> list:
+    """
+    Generic paginated GET loop shared by polling adapters.
+
+    Repeatedly GETs ``url`` with evolving query params, accumulating items
+    extracted by ``extract_batch``, until ``advance()`` returns None (no more
+    pages) or a 429 is hit — a 429 stops pagination and returns whatever has
+    been collected so far, without raising.
+
+    Args:
+        extract_batch: given a decoded JSON response, return this page's items.
+        advance: given (response_json, current_params), return the next
+            request's params dict, or None to stop paginating.
+        is_ok: optional predicate on the decoded response; return False to
+            stop paginating on an API-level error (e.g. Slack's "ok" field).
+            Defaults to always-True — HTTP status is the only failure signal.
+        on_page: optional side-effect callback invoked with (batch, response_json)
+            after each page — e.g. to track a value out of the response shape
+            that isn't part of the accumulated items themselves.
+    """
+    results: list = []
+    params = dict(initial_params)
+
+    while True:
+        async with session.get(url, headers=headers, params=params) as resp:
+            if resp.status == 429:
+                log.warning(
+                    "[%s] rate limited on %s — stopping pagination",
+                    log_prefix, rate_limit_label,
+                )
+                break
+            resp.raise_for_status()
+            data = await resp.json()
+
+        if is_ok is not None and not is_ok(data):
+            break
+
+        batch = extract_batch(data)
+        results.extend(batch)
+        if on_page is not None:
+            on_page(batch, data)
+
+        next_params = advance(data, params)
+        if next_params is None:
+            break
+        params = next_params
+
+    return results
 
 
 class PollingAdapter(ABC):

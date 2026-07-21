@@ -17,7 +17,7 @@ Quick start:
 """
 
 from .bus import EventBus
-from .events.models import Event, EventMeta, SystemEventType, HarnessEventType, TrustLevel, WILDCARD_STREAM
+from .events.models import Event, EventMeta, LoopType, SystemEventType, HarnessEventType, TrustLevel, WILDCARD_STREAM
 from .events.router import EventRouter, Subscriber
 from .events.store import append_event, load_events
 from .events.headlines import EventHeadline, append_headline, load_headlines, expand_event
@@ -51,6 +51,7 @@ __all__ = [
     # Events
     "Event",
     "EventMeta",
+    "LoopType",
     "SystemEventType",
     "HarnessEventType",
     "TrustLevel",

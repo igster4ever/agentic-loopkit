@@ -1,4 +1,6 @@
-from agentic_loopkit.events.models import Event, EventMeta, SystemEventType
+import pytest
+
+from agentic_loopkit.events.models import Event, EventMeta, LoopType, SystemEventType
 
 
 def test_stream_derived_from_event_type():
@@ -111,6 +113,17 @@ def test_eventmeta_tags_are_copied():
     d = meta.to_dict()
     d["tags"].append("c")
     assert meta.tags == ["a", "b"]  # original unmodified
+
+
+def test_eventmeta_rejects_unknown_loop_type():
+    with pytest.raises(ValueError):
+        EventMeta(loop_type="not_a_real_loop_type")
+
+
+def test_eventmeta_accepts_loop_type_enum_member():
+    meta = EventMeta(loop_type=LoopType.COUNCIL)
+    assert meta.loop_type == "council"
+    assert meta.to_dict()["loop_type"] == "council"
 
 
 def test_event_meta_returns_meta_dict():

@@ -41,8 +41,9 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from agentic_loopkit import OutcomeExecutor, RALFResult, Event
+from agentic_loopkit import RALFResult, Event
 from agentic_govkit.events.models import GovernanceEventType
+from agentic_govkit.loops.consensus import ConsensusOutcomeExecutor
 
 log = logging.getLogger("agentic_govkit.council")
 
@@ -64,7 +65,7 @@ class CouncilOpinion:
     confidence: float = 1.0
 
 
-class CouncilExecutor(OutcomeExecutor):
+class CouncilExecutor(ConsensusOutcomeExecutor):
     """
     Fan-out governance executor.
 
@@ -119,6 +120,8 @@ class CouncilExecutor(OutcomeExecutor):
     """
 
     max_iterations: int = 3
+    success_event_type = GovernanceEventType.COUNCIL_DECISION
+    success_payload_key = "decision"
 
     # ── Abstract interface ────────────────────────────────────────────────────
 
@@ -193,40 +196,6 @@ class CouncilExecutor(OutcomeExecutor):
             "opinions": opinions,
         }
 
-    # ── follow_up ─────────────────────────────────────────────────────────────
-
-    async def follow_up(self, event: Event, result: RALFResult) -> Optional[Event]:
-        """
-        Emit governance.council_decision on consensus,
-        governance.human_override on exhaustion or confidence rejection.
-        """
-        if result.status == "complete":
-            log.info(
-                "[%s] council decision reached — correlation_id=%s",
-                self.name, event.correlation_id,
-            )
-            return event.caused(
-                GovernanceEventType.COUNCIL_DECISION,
-                self.name,
-                {
-                    "decision":       result.output,
-                    "correlation_id": event.correlation_id,
-                },
-            )
-
-        log.warning(
-            "[%s] council did not reach consensus (status=%s) — escalating to human_override",
-            self.name, result.status,
-        )
-        return event.caused(
-            GovernanceEventType.HUMAN_OVERRIDE,
-            self.name,
-            {
-                "reason":         (
-                    f"CouncilExecutor exhausted without consensus (status={result.status})"
-                ),
-                "last_output":    result.output,
-                "correlation_id": event.correlation_id,
-                "status":         result.status,
-            },
-        )
+    # follow_up() is inherited from ConsensusOutcomeExecutor — emits
+    # governance.council_decision on consensus, governance.human_override
+    # on exhaustion or confidence rejection.
