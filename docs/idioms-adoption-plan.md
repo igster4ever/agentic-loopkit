@@ -670,6 +670,9 @@ from .events.models import SystemEventType   # SystemEventType.CALIBRATION_RECOR
 
 # v8 — frontier selection (P62a)
 from .loops.frontier import BranchScore, FrontierCandidate, FrontierSelector
+
+# v8 — LoopType constrained enum (2026-07-21)
+from .events.models import LoopType   # EventMeta.loop_type validated StrEnum, 10 members
 ```
 
 ---
@@ -740,6 +743,12 @@ _Source: arXiv:2607.05297 "MetaSkill-Evolve: Recursive Self-Improvement of LLM A
 
 36. ✅ `loops/calibration.py` — `CalibrationRecord` (P60): dataclass (`executor_name`, `iteration`, `self_predicted`, `actual`, `gap`) + `compute()`; wired into `OutcomeExecutor._post_act_hook()` before the confidence overwrite; emits `SystemEventType.CALIBRATION_RECORDED` per iteration for every `OutcomeExecutor` subclass automatically; diagnostic only, no aggregation; 12 tests across `tests/loops/test_calibration.py` + `tests/loops/test_outcome.py` (2026-07-09)
 37. ✅ `loops/frontier.py` — `BranchScore` + `FrontierCandidate` + `FrontierSelector` (P62a): generalises the paper's `η₁U + η₂P̂ + η₃N` frontier-selection formula into a domain-agnostic ranking primitive; default productivity estimator = mean utility delta over `utility_history` (paper's Eq. 3 shape); default novelty estimator = `1/(1+times_selected)` visit-cooling; both overridable via `productivity_fn`/`novelty_fn`; scoring primitive only — no branch-forking pipeline, no persistent evolution DAG; 16 tests in `tests/loops/test_frontier.py` (2026-07-09)
+
+### v8 — code review backlog resolutions (2026-07-21)
+
+38. ✅ `events/models.py` — `LoopType` StrEnum: 10 members (`ooda`, `ralf`, `react`, `plan`, `reflexion`, `outcome`, `conflict`, `council`, `skillopt`, `self_harness`); `EventMeta.loop_type` now `Optional[LoopType]` with `__post_init__` validation raising `ValueError` on unknown values instead of silently accepting typos; exported top-level
+39. ✅ `agentic_govkit/loops/consensus.py` — `ConsensusOutcomeExecutor(OutcomeExecutor)`: extracted shared `follow_up()` for consensus-style governance executors (subclasses declare `success_event_type`/`success_payload_key`); `ConflictResolutionExecutor` and `CouncilExecutor` both now extend it instead of duplicating the same success-vs-`human_override` branching; not exported from `agentic_govkit`'s public API (internal base class)
+40. ✅ `adapters/base.py` — `paginate_get()`: generic paginated-GET loop (pluggable `extract_batch`/`advance`/`is_ok`/`on_page` hooks) shared by `ClickUpAdapter`/`SlackAdapter`, replacing two hand-rolled copies of the same HTTP pagination + 429-backoff shape; 5 direct unit tests added — `ClickUpAdapter`'s pagination loop previously had no direct test coverage at all
 
 ---
 

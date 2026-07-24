@@ -48,6 +48,40 @@ EnforcementAction = Callable[[str, "Event"], "Event"]
 
 # ── Built-in enforcement actions ─────────────────────────────────────────────
 
+def _build_enforcement_event(
+    agent_name: str,
+    trigger_event: Event,
+    event_type: str,
+    reason: str,
+    context: str,
+    extra_payload: dict[str, Any] | None = None,
+) -> Event:
+    """
+    Shared construction for all built-in enforcement actions.
+
+    Every enforcement action derives its output the same way: a ``caused()``
+    child event carrying ``reason`` + ``triggered_by`` + an ``EventMeta``
+    context string, always at ``TrustLevel.HIGH`` (enforcement decisions are
+    never less trusted than the policy that produced them).
+    """
+    e = trigger_event.caused(
+        event_type,
+        agent_name,
+        {
+            "reason":       reason,
+            **(extra_payload or {}),
+            "triggered_by": str(trigger_event.event_type),
+            "_meta": EventMeta(
+                phase="act",
+                loop_type="ooda",
+                context=context,
+            ).to_dict(),
+        },
+    )
+    e.trust_level = TrustLevel.HIGH
+    return e
+
+
 def halt_correlation(agent_name: str, trigger_event: Event) -> Event:
     """
     Halt processing of a correlation chain.
@@ -55,22 +89,14 @@ def halt_correlation(agent_name: str, trigger_event: Event) -> Event:
     Emits governance.halt.  Downstream agents should check for halt events
     in their observe() phases and skip events with a matching correlation_id.
     """
-    e = trigger_event.caused(
-        GovernanceEventType.HALT,
+    return _build_enforcement_event(
         agent_name,
-        {
-            "reason":         "correlation chain halted by policy",
-            "correlation_id": trigger_event.correlation_id,
-            "triggered_by":   str(trigger_event.event_type),
-            "_meta": EventMeta(
-                phase="act",
-                loop_type="ooda",
-                context=f"Halt: {trigger_event.event_type} triggered halt_correlation policy",
-            ).to_dict(),
-        },
+        trigger_event,
+        GovernanceEventType.HALT,
+        reason="correlation chain halted by policy",
+        context=f"Halt: {trigger_event.event_type} triggered halt_correlation policy",
+        extra_payload={"correlation_id": trigger_event.correlation_id},
     )
-    e.trust_level = TrustLevel.HIGH
-    return e
 
 
 def quarantine_source(agent_name: str, trigger_event: Event) -> Event:
@@ -82,22 +108,14 @@ def quarantine_source(agent_name: str, trigger_event: Event) -> Event:
     falls back to the trigger event's own source field.
     """
     source = trigger_event.payload.get("flagged_source", trigger_event.source)
-    e = trigger_event.caused(
-        GovernanceEventType.QUARANTINE,
+    return _build_enforcement_event(
         agent_name,
-        {
-            "reason":              "source quarantined by policy",
-            "quarantined_source":  source,
-            "triggered_by":        str(trigger_event.event_type),
-            "_meta": EventMeta(
-                phase="act",
-                loop_type="ooda",
-                context=f"Quarantine: {trigger_event.event_type} triggered quarantine_source policy on '{source}'",
-            ).to_dict(),
-        },
+        trigger_event,
+        GovernanceEventType.QUARANTINE,
+        reason="source quarantined by policy",
+        context=f"Quarantine: {trigger_event.event_type} triggered quarantine_source policy on '{source}'",
+        extra_payload={"quarantined_source": source},
     )
-    e.trust_level = TrustLevel.HIGH
-    return e
 
 
 def emit_human_override(agent_name: str, trigger_event: Event) -> Event:
@@ -108,22 +126,14 @@ def emit_human_override(agent_name: str, trigger_event: Event) -> Event:
     event type and flagged_event_id so a human reviewer can trace back to
     the original flagged event.
     """
-    e = trigger_event.caused(
-        GovernanceEventType.HUMAN_OVERRIDE,
+    return _build_enforcement_event(
         agent_name,
-        {
-            "reason":           "escalated to human review by policy",
-            "triggered_by":     str(trigger_event.event_type),
-            "flagged_event_id": trigger_event.payload.get("flagged_event_id"),
-            "_meta": EventMeta(
-                phase="act",
-                loop_type="ooda",
-                context=f"Human override: {trigger_event.event_type} triggered emit_human_override policy",
-            ).to_dict(),
-        },
+        trigger_event,
+        GovernanceEventType.HUMAN_OVERRIDE,
+        reason="escalated to human review by policy",
+        context=f"Human override: {trigger_event.event_type} triggered emit_human_override policy",
+        extra_payload={"flagged_event_id": trigger_event.payload.get("flagged_event_id")},
     )
-    e.trust_level = TrustLevel.HIGH
-    return e
 
 
 # ── KillSwitchAgent ───────────────────────────────────────────────────────────

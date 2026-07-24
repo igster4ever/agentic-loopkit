@@ -33,7 +33,7 @@ from typing import TYPE_CHECKING, Optional
 
 from .events.models import Event, SystemEventType
 from .events.router import EventRouter
-from .events.store import append_event
+from .events.store import append_event, compact_stream
 from .events.headlines import EventHeadline, append_headline, load_headlines, expand_event
 
 if TYPE_CHECKING:
@@ -58,6 +58,8 @@ class EventBus:
         store_dir: Optional[Path] = None,
         backpressure_threshold: int = 100,
         drain_timeout: float = 5.0,
+        compaction_interval_hours: Optional[float] = None,
+        compaction_retention_hours: Optional[int] = None,
     ) -> None:
         self.store_dir: Path = (store_dir or _DEFAULT_STORE).expanduser()
         self.store_dir.mkdir(parents=True, exist_ok=True)
@@ -70,6 +72,15 @@ class EventBus:
         self._event_counter         = 0   # non-system events since last pressure signal
         self._stopping              = False
         self._active_ticks          = 0   # ticks currently in-flight
+
+        # Compaction: opt-in periodic background task (None = disabled — the
+        # historical default; compact_stream() otherwise has no caller outside
+        # tests, so lifetime event count grows unboundedly for long-running
+        # deployments). compaction_retention_hours=None defers to compact_stream()'s
+        # own default retention window.
+        self.compaction_interval_hours  = compaction_interval_hours
+        self.compaction_retention_hours = compaction_retention_hours
+        self._compaction_task: Optional[asyncio.Task] = None
 
     # ── Registration ───────────────────────────────────────────────────────────
 
@@ -118,6 +129,8 @@ class EventBus:
     async def start(self) -> None:
         """Emit BUS_STARTED.  Call from application lifespan."""
         self._started = True
+        if self.compaction_interval_hours:
+            self._compaction_task = asyncio.create_task(self._compaction_loop())
         await self.publish(Event(
             event_type = SystemEventType.BUS_STARTED,
             source     = "bus",
@@ -137,6 +150,13 @@ class EventBus:
         before forcing shutdown.  Call from lifespan teardown.
         """
         self._stopping = True
+        if self._compaction_task is not None:
+            self._compaction_task.cancel()
+            try:
+                await self._compaction_task
+            except asyncio.CancelledError:
+                pass
+            self._compaction_task = None
         timeout = drain_timeout if drain_timeout is not None else self.drain_timeout
         waited, step = 0.0, 0.05
         while self._active_ticks > 0 and waited < timeout:
@@ -178,6 +198,44 @@ class EventBus:
     def expand_event(self, chunk_id: int, stream: str) -> "Event | None":
         """Resolve a chunk_id to the full ``Event``.  Returns None if not found."""
         return expand_event(chunk_id, stream, store_dir=self.store_dir)
+
+    # ── Compaction (opt-in periodic maintenance) ──────────────────────────────
+
+    async def _compaction_loop(self) -> None:
+        """Background task: compact every stream file every ``compaction_interval_hours``.
+
+        Runs until cancelled by ``stop()``.  A plain ``asyncio.create_task()``
+        loop is sufficient here — no external scheduler/cron dependency needed,
+        since the bus already owns an event loop for its entire lifetime.
+        """
+        interval_seconds = self.compaction_interval_hours * 3600
+        while True:
+            try:
+                await asyncio.sleep(interval_seconds)
+            except asyncio.CancelledError:
+                return
+            self.compact_all_streams()
+
+    def compact_all_streams(self) -> dict[str, int]:
+        """
+        Compact every ``events-*.jsonl`` file in ``store_dir``.
+
+        Returns ``{stream: removed_count}`` for streams with at least one
+        event removed.  Safe to call directly (e.g. from a management CLI
+        or an ad-hoc maintenance task) — it does not require the background
+        loop to be running.
+        """
+        kwargs: dict = {}
+        if self.compaction_retention_hours is not None:
+            kwargs["hours"] = self.compaction_retention_hours
+
+        removed_by_stream: dict[str, int] = {}
+        for path in sorted(self.store_dir.glob("events-*.jsonl")):
+            stream = path.stem[len("events-"):]
+            removed = compact_stream(stream, store_dir=self.store_dir, **kwargs)
+            if removed:
+                removed_by_stream[stream] = removed
+        return removed_by_stream
 
     # ── Tick registration (called by PollingAdapter) ──────────────────────────
 

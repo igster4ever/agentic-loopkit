@@ -314,6 +314,34 @@ audit trails, and local dev/test without live external systems.
 
 **Wildcard:** `load_events("*")` loads all stream files.
 
+**Compaction (✅ wired 2026-07-24):** `compact_stream()` rewrites a stream file to
+keep only events within a retention window — but until this date it had no caller
+outside tests. Reactive components (`ProjectionAgent`, `FailurePatternAgent`,
+`SelfHarnessExecutor`) call `load_events()`/`load_all_events()` with no hours
+cutoff on every triggering event, so their cost scales with *total lifetime
+event count* for a stream, not a bounded window — the real latency-growth risk
+for a long-running deployment (a 2026-07-21 spike found the linear-scan cost
+itself negligible at realistic scale; unbounded growth was the actual gap).
+
+`EventBus` now owns an opt-in background compaction loop:
+
+```python
+bus = EventBus(
+    store_dir=Path("~/.cache/my-app"),
+    compaction_interval_hours=24,       # None (default) = disabled
+    compaction_retention_hours=72,      # None = compact_stream()'s own default
+)
+await bus.start()   # background asyncio task compacts every stream on interval
+...
+await bus.stop()    # cancels the compaction task cleanly
+```
+
+A plain `asyncio.create_task()` loop is sufficient — no external scheduler/cron
+dependency, since the bus already owns an event loop for its lifetime. Call
+`bus.compact_all_streams() -> dict[str, int]` directly for a one-off compaction
+(e.g. from a management CLI) without waiting for the interval or running
+`start()` at all.
+
 ---
 
 ## Confidence model
@@ -380,6 +408,13 @@ RALF sits at the same level as ReAct — both are execution patterns invoked fro
 Cursor is opaque — use whatever the source API provides: Unix ms timestamp (ClickUp),
 ISO string, page token, sequence number, or a set of seen IDs.
 
+**`paginate_get()` (✅ 2026-07-21)** — `adapters/base.py` provides a generic paginated-GET
+loop (pluggable `extract_batch`/`advance`/`is_ok`/`on_page` hooks) shared by
+`ClickUpAdapter` and `SlackAdapter`, replacing two hand-rolled copies of the same
+HTTP pagination + 429-backoff shape. A `429` stops pagination without raising. Not
+part of the top-level public API — import from `agentic_loopkit.adapters.base` when
+writing a new paginated adapter.
+
 ---
 
 ## Extensions (v2–v8 — all shipped except where marked planned)
@@ -400,7 +435,8 @@ RALF variants extend `RALFExecutor` via `_post_act_hook()` — never by copying 
 | `SkillOptExecutor` | `loops/skillopt.py` | RALF-based bounded skill optimiser (arXiv:2605.23904); LLM in `reflect()` only; `score()` deterministic; validation gate + rejected-edit buffer + `slow_update()` hook; `edit_budget` cap | ✅ Built (2026-06-11) |
 | `FailurePatternAgent` | `agents/failure_pattern.py` | `ProjectionAgent` subclass; clusters error events by `FailureSignature(terminal_cause, causal_status, agent_mechanism)`; emits `system.failure_pattern_detected` | ✅ Built (2026-06-16) |
 | `SelfHarnessExecutor` | `loops/self_harness.py` | `OutcomeExecutor` subclass; wires `FailurePatternAgent` → `SkillOptExecutor` → `AgentTestHarness.regression_gate()` → emit `harness.edit_accepted/rejected`; evaluate() is deterministic — no LLM | ✅ Built (2026-06-16) |
-| `CouncilExecutor` | `agentic_govkit/loops/council.py` | `OutcomeExecutor` subclass (govkit); submits question to N specialist agents in parallel; isolated `evaluate()` for consensus quality gate; emits `governance.council_decision` on consensus or `governance.human_override` on failure | ✅ Built (2026-06-18) |
+| `ConsensusOutcomeExecutor` | `agentic_govkit/loops/consensus.py` | `OutcomeExecutor` subclass (govkit); shared `follow_up()` for consensus-style governance executors — subclasses declare `success_event_type`/`success_payload_key` and inherit the success-vs-`governance.human_override` branching; not part of the public `agentic_govkit` API (internal base only) | ✅ Built (2026-07-21) |
+| `CouncilExecutor` | `agentic_govkit/loops/council.py` | `ConsensusOutcomeExecutor` subclass (govkit); submits question to N specialist agents in parallel; isolated `evaluate()` for consensus quality gate; emits `governance.council_decision` on consensus or `governance.human_override` on failure | ✅ Built (2026-06-18; re-based on `ConsensusOutcomeExecutor` 2026-07-21) |
 | `VerificationContract` | `loops/contract.py` | P55e — dataclass (`criteria`, `evidence_type`, `stopping_condition`); `to_rubric()` bridges into `OutcomeExecutor.rubric` with no lifecycle change; loopkit-side counterpart to compass's `goal_contracts`; `from_goal_contract()` constructs one from a compass contract dict | ✅ Built (2026-07-05) |
 | `CalibrationRecord` | `loops/calibration.py` | P60 — self-prediction calibration; `OutcomeExecutor._post_act_hook()` pairs `act()`'s `result.confidence` against `evaluate()`'s `satisfied` before the confidence overwrite; emits `system.calibration_recorded` per iteration; diagnostic only, no aggregation | ✅ Built (2026-07-09) |
 | `FrontierSelector` | `loops/frontier.py` | P62a — generalises MetaSkill-Evolve's frontier-selection formula (`η₁U + η₂P̂ + η₃N`) into a domain-agnostic ranking primitive over `FrontierCandidate` pools; sibling to `UtilityExecutor` (ranks an existing candidate pool + history, not a fresh generate-and-rank pass); scoring primitive only, no branch-forking pipeline; `revoke()` (P64a) permanently de-authorizes a candidate, excluding it from `rank()`/`select()` regardless of future utility_history | ✅ Built (2026-07-09; revoke() 2026-07-15) |
@@ -411,6 +447,12 @@ RALF variants extend `RALFExecutor` via `_post_act_hook()` — never by copying 
 write structured framework metadata (phase, loop_type, confidence, context text) into
 `payload["_meta"]`. Consumer payload keys are never modified.
 Read back via `event.meta()` — returns the dict or `None` if absent.
+
+**`loop_type` is a validated `LoopType` StrEnum (✅ 2026-07-21)** — no longer a free
+string. `EventMeta.__post_init__` raises `ValueError` on unknown values instead of
+silently accepting typos. 10 members: `ooda`, `ralf`, `react`, `plan`, `reflexion`,
+`outcome`, `conflict`, `council`, `skillopt`, `self_harness`. Exported top-level as
+`LoopType`.
 
 ### EventHeadline / LCLM storage compression (see `events/headlines.py`)
 
@@ -557,6 +599,8 @@ bus.register(kill)
 Mediates between two competing agent orientations about the same entity.  Triggered by
 `governance.dispute_opened`; resolves to `governance.dispute_resolved` or escalates to
 `governance.human_override` on max iterations.  Located at `agentic_govkit/loops/conflict.py`.
+Extends `ConsensusOutcomeExecutor` (2026-07-21) — its `follow_up()` is inherited, not
+hand-rolled; see the `ConsensusOutcomeExecutor` executor-table row above.
 
 Full spec in `docs/idioms-adoption-plan.md § ConflictResolutionExecutor`.
 

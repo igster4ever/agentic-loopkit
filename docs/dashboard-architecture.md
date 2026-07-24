@@ -636,7 +636,7 @@ class EventMeta:
     Written to payload["_meta"]. Consumer payload keys are never touched.
     """
     phase:      str   | None = None   # "observe"|"orient"|"decide"|"act"|"think"|"execute"
-    loop_type:  str   | None = None   # "ooda"|"ralf"|"react"|"plan"|"reflexion"|"outcome"|"conflict"|"skillopt"|"self_harness"
+    loop_type:  str   | None = None   # "ooda"|"ralf"|"react"|"plan"|"reflexion"|"outcome"|"conflict"|"council"|"skillopt"|"self_harness" — validated LoopType StrEnum (2026-07-21), not a free string
     iteration:  int   | None = None   # loop iteration number
     confidence: float | None = None   # confidence score (0.0–1.0)
     context:    str   | None = None   # agent reasoning text → dashboard Context tab
