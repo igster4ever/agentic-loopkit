@@ -1,12 +1,12 @@
 import json
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
-
-import pytest
 
 from agentic_loopkit.events.models import Event
 from agentic_loopkit.events.store import (
-    append_event, load_events, load_all_events, compact_stream,
+    append_event,
+    compact_stream,
+    load_all_events,
+    load_events,
 )
 
 

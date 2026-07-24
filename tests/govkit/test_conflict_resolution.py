@@ -14,12 +14,10 @@ Covers:
   - follow_up() can be overridden for custom payload enrichment
 """
 
-import pytest
-from agentic_loopkit import EventBus, Event
-from agentic_loopkit.loops.ralf import RALFResult
-from agentic_loopkit.events.store import load_events
 from agentic_govkit import ConflictResolutionExecutor, GovernanceEventType
-
+from agentic_loopkit import Event, EventBus
+from agentic_loopkit.events.store import load_events
+from agentic_loopkit.loops.ralf import RALFResult
 
 _RUBRIC = "## Reconciliation Rubric\n- Synthesis must address both positions.\n"
 

@@ -5,14 +5,14 @@ All tests use a real EventBus with a tmp store — no mocking of bus internals.
 Follows the same fixture pattern as tests/agents/test_base.py.
 """
 
-import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
-from agentic_loopkit import Event, TrustLevel, WILDCARD_STREAM
+import pytest
+
 from agentic_govkit import AuditAgent
 from agentic_govkit.events.models import GovernanceEventType
-
+from agentic_loopkit import WILDCARD_STREAM, Event, TrustLevel
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
 

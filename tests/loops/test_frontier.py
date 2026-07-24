@@ -15,7 +15,6 @@ import pytest
 
 from agentic_loopkit.loops.frontier import BranchScore, FrontierCandidate, FrontierSelector
 
-
 # ── BranchScore ───────────────────────────────────────────────────────────────
 
 def test_branch_score_default_weights_sum():

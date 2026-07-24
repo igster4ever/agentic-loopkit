@@ -32,11 +32,11 @@ from __future__ import annotations
 
 import logging
 from abc import abstractmethod
-from typing import Any, Optional
+from typing import Optional
 
-from agentic_loopkit import RALFResult, Event
 from agentic_govkit.events.models import GovernanceEventType
 from agentic_govkit.loops.consensus import ConsensusOutcomeExecutor
+from agentic_loopkit import Event, RALFResult
 
 log = logging.getLogger("agentic_govkit.conflict")
 

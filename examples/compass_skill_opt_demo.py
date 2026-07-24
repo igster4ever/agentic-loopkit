@@ -38,7 +38,6 @@ from agentic_loopkit.events.store import load_all_events
 from agentic_loopkit.loops.skillopt import RejectedEdit, SkillEdit, SkillOptExecutor, SkillOptResult
 from agentic_loopkit.testing import AsyncLLMCallable
 
-
 # ── Compass history parsing ────────────────────────────────────────────────────
 
 _DEFAULT_LOOP_DIR = Path("~/.claude/loop").expanduser()
@@ -281,7 +280,7 @@ class CompassSkillOptExecutor(SkillOptExecutor):
             "document below to address failure patterns and reinforce success patterns.\n\n"
             f"## Current skill\n{skill}\n\n"
             f"## Failure patterns\n" + "\n".join(failure_patterns or ["(none)"]) + "\n\n"
-            f"## Success patterns\n" + "\n".join(success_patterns or ["(none)"]) + "\n\n"
+            "## Success patterns\n" + "\n".join(success_patterns or ["(none)"]) + "\n\n"
             + (
                 "## Previously rejected (do not repeat)\n"
                 + "\n".join(rejected_notes) + "\n\n"

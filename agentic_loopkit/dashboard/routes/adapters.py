@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from ..dependencies import get_bus
 from ...bus import EventBus
+from ..dependencies import get_bus
 
 router = APIRouter()
 

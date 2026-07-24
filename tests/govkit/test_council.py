@@ -17,12 +17,10 @@ Covers:
   - no council_decision when human_override fires
 """
 
-import pytest
-from agentic_loopkit import EventBus, Event
-from agentic_loopkit.loops.ralf import RALFResult
-from agentic_loopkit.events.store import load_events
 from agentic_govkit import CouncilExecutor, CouncilOpinion, GovernanceEventType
-
+from agentic_loopkit import Event, EventBus
+from agentic_loopkit.events.store import load_events
+from agentic_loopkit.loops.ralf import RALFResult
 
 _RUBRIC = "## Council Rubric\n- Decision must reference all opinions.\n"
 

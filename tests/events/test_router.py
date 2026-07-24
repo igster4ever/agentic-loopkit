@@ -1,6 +1,5 @@
-import pytest
+from agentic_loopkit.events.models import WILDCARD_STREAM, Event
 from agentic_loopkit.events.router import EventRouter
-from agentic_loopkit.events.models import Event, WILDCARD_STREAM
 
 
 def make_event(stream="gps") -> Event:

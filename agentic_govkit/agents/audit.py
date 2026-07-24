@@ -21,8 +21,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from agentic_loopkit import AgentBase, Event, EventMeta, TrustLevel, WILDCARD_STREAM
 from agentic_govkit.events.models import GovernanceEventType
+from agentic_loopkit import WILDCARD_STREAM, AgentBase, Event, EventMeta, TrustLevel
 
 
 class AuditAgent(AgentBase):

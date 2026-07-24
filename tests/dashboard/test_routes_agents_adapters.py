@@ -2,16 +2,11 @@
 tests/dashboard/test_routes_agents_adapters.py — GET /api/agents and GET /api/adapters
 """
 
-import pytest
-from pathlib import Path
-from httpx import AsyncClient, ASGITransport
-from unittest.mock import MagicMock
+from httpx import ASGITransport, AsyncClient
 
+from agentic_loopkit.agents.base import AgentBase
 from agentic_loopkit.bus import EventBus
 from agentic_loopkit.dashboard import create_app
-from agentic_loopkit.agents.base import AgentBase
-from agentic_loopkit.events.models import Event
-
 
 # ── Minimal concrete agent ────────────────────────────────────────────────────
 

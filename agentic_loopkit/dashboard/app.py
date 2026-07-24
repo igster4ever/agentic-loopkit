@@ -24,9 +24,9 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
-from .routes import events, chains, streams, agents, adapters, memory
-from .ws import router as ws_router
 from ..bus import EventBus
+from .routes import adapters, agents, chains, events, memory, streams
+from .ws import router as ws_router
 
 _UI_DIST = Path(__file__).parent.parent.parent / "dashboard" / "ui" / "dist"
 

@@ -4,12 +4,12 @@ tests/adapters/test_slack.py — SlackAdapter unit tests.
 All tests mock the aiohttp HTTP layer so no real Slack API is called.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
-from agentic_loopkit.bus import EventBus
-from agentic_loopkit.adapters.slack import SlackAdapter, SlackEventType, _ts_to_iso
-from agentic_loopkit.events.models import Event
 
+import pytest
+
+from agentic_loopkit.adapters.slack import SlackAdapter, SlackEventType, _ts_to_iso
+from agentic_loopkit.bus import EventBus
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 

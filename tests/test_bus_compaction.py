@@ -10,8 +10,6 @@ triggering event, so cost scales with unbounded lifetime event count.
 import asyncio
 from datetime import timedelta
 
-import pytest
-
 from agentic_loopkit.bus import EventBus
 from agentic_loopkit.events.models import Event
 from agentic_loopkit.events.store import append_event, load_all_events

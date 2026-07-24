@@ -19,10 +19,9 @@ import shutil
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Literal, Optional
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Callable, Literal, Optional, Protocol, runtime_checkable
 
-from .events.models import Event, WILDCARD_STREAM
+from .events.models import WILDCARD_STREAM, Event
 from .events.store import load_all_events
 from .utils.time import now_ms
 

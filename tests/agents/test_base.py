@@ -1,6 +1,5 @@
-import pytest
-from agentic_loopkit.bus import EventBus
 from agentic_loopkit.agents.base import AgentBase, AgentState
+from agentic_loopkit.bus import EventBus
 from agentic_loopkit.events.models import Event
 from agentic_loopkit.events.store import load_events
 

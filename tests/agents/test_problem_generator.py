@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
+
+import pytest
 
 from agentic_loopkit import (
-    Event, EventBus,
-    ProblemGeneratorAgent, AgendaEventType, AgendaItem,
+    AgendaEventType,
+    AgendaItem,
+    Event,
+    EventBus,
+    ProblemGeneratorAgent,
 )
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

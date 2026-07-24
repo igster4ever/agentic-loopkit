@@ -21,7 +21,6 @@ from typing import Optional
 
 from .models import Event, TrustLevel
 
-
 _TRUST_WEIGHT: dict[TrustLevel, float] = {
     TrustLevel.HIGH:      3.0,
     TrustLevel.MEDIUM:    2.0,

@@ -5,13 +5,12 @@ Uses a real EventBus + tmp_path store so load_all_events() round-trips
 through the actual JSONL persistence layer — no store mocking.
 """
 
-import pytest
-from pathlib import Path
 
-from agentic_loopkit import EventBus, Event, ProjectionAgent, ProjectionEventType
+import pytest
+
+from agentic_loopkit import Event, EventBus, ProjectionAgent, ProjectionEventType
 from agentic_loopkit.events.models import EventMeta, TrustLevel
 from agentic_loopkit.events.store import append_event
-
 
 # ── Concrete subclass for testing ─────────────────────────────────────────────
 
@@ -274,6 +273,7 @@ async def test_projection_event_type_lands_on_projection_stream():
 # ── public API export ─────────────────────────────────────────────────────────
 
 def test_exported_from_public_api():
-    from agentic_loopkit import ProjectionAgent as PA, ProjectionEventType as PET  # noqa: F401
+    from agentic_loopkit import ProjectionAgent as PA  # noqa: F401
+    from agentic_loopkit import ProjectionEventType as PET
     assert PA is not None
     assert PET.UPDATED == "projection.updated"

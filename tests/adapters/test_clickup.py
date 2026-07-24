@@ -1,7 +1,9 @@
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-from agentic_loopkit.bus import EventBus
+
 from agentic_loopkit.adapters.clickup import ClickUpAdapter, ClickUpEventType
+from agentic_loopkit.bus import EventBus
 from agentic_loopkit.events.models import Event
 
 
@@ -133,7 +135,8 @@ def test_task_to_event_priority_none_when_not_dict(tmp_path):
 # ── Deduplication ─────────────────────────────────────────────────────────────
 
 async def test_fetch_all_deduplicates_same_task_across_lists(tmp_path):
-    import sys, types
+    import sys
+    import types
 
     bus = EventBus(store_dir=tmp_path)
     adapter = make_adapter(bus, list_ids=["list-1", "list-2"])

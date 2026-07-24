@@ -1,6 +1,7 @@
 import asyncio
-import uvicorn
 from pathlib import Path
+
+import uvicorn
 
 
 async def main():

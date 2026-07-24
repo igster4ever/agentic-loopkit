@@ -7,19 +7,18 @@ are mocked for error / edge-case tests.
 
 import subprocess
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
-from agentic_loopkit.bus import EventBus
 from agentic_loopkit.adapters.git import (
-    LocalGitAdapter,
-    GitEventType,
-    _parse_git_log,
-    _normalise_timestamp,
     _RECORD_START,
+    GitEventType,
+    LocalGitAdapter,
+    _normalise_timestamp,
+    _parse_git_log,
 )
-
+from agentic_loopkit.bus import EventBus
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

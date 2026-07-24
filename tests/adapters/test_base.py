@@ -1,9 +1,8 @@
 import json
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-from agentic_loopkit.bus import EventBus
 from agentic_loopkit.adapters.base import PollingAdapter, paginate_get
+from agentic_loopkit.bus import EventBus
 from agentic_loopkit.events.models import Event
 from agentic_loopkit.events.store import load_events
 

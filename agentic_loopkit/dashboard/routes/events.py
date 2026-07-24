@@ -12,12 +12,12 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..constants import DEFAULT_HOURS, DEFAULT_LIMIT, MAX_LIMIT
-from ..dependencies import get_bus
 from ...bus import EventBus
 from ...events.models import WILDCARD_STREAM
 from ...events.store import load_events
 from ...utils.time import iso_format
+from ..constants import DEFAULT_HOURS, DEFAULT_LIMIT, MAX_LIMIT
+from ..dependencies import get_bus
 
 log = logging.getLogger("agentic_loopkit.dashboard.routes.events")
 router = APIRouter()

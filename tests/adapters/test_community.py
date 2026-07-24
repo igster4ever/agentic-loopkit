@@ -7,10 +7,9 @@ from pathlib import Path
 
 import pytest
 
+from agentic_loopkit.adapters.community import CommunityEventType, CommunityFeedAdapter
 from agentic_loopkit.bus import EventBus
-from agentic_loopkit.adapters.community import CommunityFeedAdapter, CommunityEventType
 from agentic_loopkit.events.models import TrustLevel
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -237,6 +236,6 @@ async def test_truncated_file_resets_to_start(tmp_path):
 # ── Public API import ──────────────────────────────────────────────────────────
 
 def test_public_api_exports():
-    from agentic_loopkit import CommunityFeedAdapter, CommunityEventType
+    from agentic_loopkit import CommunityEventType, CommunityFeedAdapter
     assert CommunityFeedAdapter is not None
     assert CommunityEventType.ENTRY_RECEIVED == "community.entry_received"

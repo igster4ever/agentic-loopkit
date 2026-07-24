@@ -14,12 +14,10 @@ Covers:
   - Stream isolation: chunk_ids are independent per stream
 """
 
-import pytest
-from pathlib import Path
 
-from agentic_loopkit import EventBus, Event, EventHeadline, append_headline, load_headlines, expand_event
-from agentic_loopkit.events.models import SystemEventType, EventMeta
-from agentic_loopkit.events.store import load_events, compact_stream
+from agentic_loopkit import Event, EventBus, EventHeadline, append_headline, expand_event, load_headlines
+from agentic_loopkit.events.models import EventMeta, SystemEventType
+from agentic_loopkit.events.store import compact_stream
 
 
 def make_event(event_type="things.happened", source="test", payload=None) -> Event:

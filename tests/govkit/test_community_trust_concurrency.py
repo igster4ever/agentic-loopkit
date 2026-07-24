@@ -23,9 +23,9 @@ from pathlib import Path
 
 import pytest
 
-from agentic_loopkit import Event, EventBus, TrustLevel
 from agentic_govkit import AuditAgent, GovernanceEventType
 from agentic_govkit.agents.community_trust import CommunityTrustLearner
+from agentic_loopkit import Event, EventBus, TrustLevel
 
 
 def untrusted_event(source: str) -> Event:

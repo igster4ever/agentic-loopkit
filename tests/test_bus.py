@@ -1,4 +1,3 @@
-import pytest
 from agentic_loopkit.bus import EventBus
 from agentic_loopkit.events.models import Event, SystemEventType
 from agentic_loopkit.events.store import load_events
@@ -50,8 +49,8 @@ async def test_start_emits_bus_started(tmp_path):
 
 
 async def test_start_payload_includes_agent_and_adapter_names(tmp_path):
-    from agentic_loopkit.agents.base import AgentBase
     from agentic_loopkit.adapters.base import PollingAdapter
+    from agentic_loopkit.agents.base import AgentBase
 
     class StubAgent(AgentBase):
         async def orient(self, event, context): return None
@@ -96,8 +95,8 @@ async def test_store_dir_created_on_init(tmp_path):
 
 
 async def test_status_reflects_registered_components(tmp_path):
-    from agentic_loopkit.agents.base import AgentBase
     from agentic_loopkit.adapters.base import PollingAdapter
+    from agentic_loopkit.agents.base import AgentBase
 
     class StubAgent(AgentBase):
         async def orient(self, event, context): return None

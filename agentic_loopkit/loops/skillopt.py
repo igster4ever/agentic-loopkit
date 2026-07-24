@@ -17,9 +17,8 @@ LLM placement: reflect() only (optimizer model). score() is deterministic — no
 
 from __future__ import annotations
 
-import re
 from abc import abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 from .ralf import RALFExecutor, RALFResult

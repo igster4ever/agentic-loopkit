@@ -16,7 +16,7 @@ import logging
 from collections import defaultdict
 from typing import Awaitable, Callable
 
-from .models import Event, WILDCARD_STREAM
+from .models import WILDCARD_STREAM, Event
 
 log = logging.getLogger("agentic_loopkit.router")
 

@@ -50,6 +50,8 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
     "httpx>=0.27",       # async test client for dashboard routes
+    "ruff>=0.6",
+    "mypy>=1.11",
 ]
 
 [project.scripts]
@@ -71,3 +73,19 @@ exclude = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"agentic_loopkit/dashboard/routes/*.py" = ["B008"]
+"agentic_loopkit/dashboard/ws.py" = ["B008"]
+
+[tool.mypy]
+python_version = "3.11"
+packages = ["agentic_loopkit", "agentic_govkit"]
+ignore_missing_imports = true

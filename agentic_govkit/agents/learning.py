@@ -51,8 +51,8 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from agentic_loopkit import AgentBase, Event, EventMeta, TrustLevel, load_events
 from agentic_govkit.events.models import GovernanceEventType
+from agentic_loopkit import AgentBase, Event, EventMeta, TrustLevel, load_events
 
 
 @dataclass

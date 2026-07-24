@@ -4,11 +4,11 @@ Tests for v4 theme 3 — working memory lifecycle:
   - Graceful shutdown sequencing
 """
 import asyncio
-import pytest
+
+from agentic_loopkit.adapters.base import PollingAdapter
 from agentic_loopkit.bus import EventBus
 from agentic_loopkit.events.models import Event, SystemEventType
 from agentic_loopkit.events.store import load_events
-from agentic_loopkit.adapters.base import PollingAdapter
 
 
 def make_event(stream="work") -> Event:

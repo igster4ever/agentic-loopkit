@@ -23,11 +23,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "examples"))
 
-from agentic_loopkit.bus import EventBus
-from agentic_loopkit.events.models import Event, HarnessEventType
-from agentic_loopkit.events.store import load_all_events
-from agentic_loopkit.testing import AgentTestHarness, TestResult, TestSuiteResult
-
 from compass_skill_opt_demo import (
     DEMO_SKILL,
     DEMO_TRAJECTORIES,
@@ -38,6 +33,10 @@ from compass_skill_opt_demo import (
     load_trajectories,
 )
 
+from agentic_loopkit.bus import EventBus
+from agentic_loopkit.events.models import Event, HarnessEventType
+from agentic_loopkit.events.store import load_all_events
+from agentic_loopkit.testing import AgentTestHarness, TestResult, TestSuiteResult
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -168,7 +167,7 @@ def test_reflect_stub_returns_empty_on_no_failures(tmp_path):
 
 
 def test_reflect_stub_skips_rejected_content(demo_store, tmp_path):
-    from agentic_loopkit.loops.skillopt import RejectedEdit, SkillEdit
+    from agentic_loopkit.loops.skillopt import RejectedEdit
 
     bus = EventBus(store_dir=tmp_path / "bus")
     executor = CompassSkillOptExecutor("cso", bus, DEMO_SKILL, demo_store)

@@ -28,6 +28,7 @@ from typing import Any, Optional
 
 from ..utils.time import iso_format
 
+
 class SystemEventType(StrEnum):
     """Built-in loopkit system events.  Stream: 'system'."""
     BUS_STARTED              = "system.bus_started"

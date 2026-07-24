@@ -12,18 +12,16 @@ Covers:
   - max_iterations cap (inherited from OutcomeExecutor)
 """
 
-import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock
 
 from agentic_loopkit.bus import EventBus
 from agentic_loopkit.events.models import Event, HarnessEventType, SystemEventType
 from agentic_loopkit.events.store import append_event
-from agentic_loopkit.loops.self_harness import SelfHarnessExecutor
-from agentic_loopkit.loops.skillopt import SkillOptExecutor, SkillEdit, SkillOptResult
 from agentic_loopkit.loops.ralf import RALFResult
-from agentic_loopkit.testing import AgentTestHarness, TestSuiteResult, TestTask, TestResult
-
+from agentic_loopkit.loops.self_harness import SelfHarnessExecutor
+from agentic_loopkit.loops.skillopt import SkillEdit, SkillOptExecutor, SkillOptResult
+from agentic_loopkit.testing import AgentTestHarness, TestResult, TestSuiteResult, TestTask
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 

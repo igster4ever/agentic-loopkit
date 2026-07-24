@@ -41,9 +41,9 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from agentic_loopkit import RALFResult, Event
 from agentic_govkit.events.models import GovernanceEventType
 from agentic_govkit.loops.consensus import ConsensusOutcomeExecutor
+from agentic_loopkit import Event, RALFResult
 
 log = logging.getLogger("agentic_govkit.council")
 

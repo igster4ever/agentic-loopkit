@@ -1,10 +1,11 @@
-import pytest
 from agentic_loopkit.bus import EventBus
-from agentic_loopkit.loops.ralf import (
-    RALFExecutor, RALFResult, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, CONFIDENCE_HIGH,
-)
 from agentic_loopkit.events.models import Event
 from agentic_loopkit.events.store import load_events
+from agentic_loopkit.loops.ralf import (
+    CONFIDENCE_LOW,
+    RALFExecutor,
+    RALFResult,
+)
 
 
 def make_event(**kwargs) -> Event:

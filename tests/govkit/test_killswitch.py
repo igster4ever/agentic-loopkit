@@ -15,15 +15,14 @@ Covers:
   - multiple policy entries — each fires independently
 """
 
-import pytest
-from agentic_loopkit import EventBus, Event, TrustLevel
-from agentic_loopkit.events.store import load_events
-from agentic_govkit import KillSwitchAgent, GovernanceEventType
+from agentic_govkit import GovernanceEventType, KillSwitchAgent
 from agentic_govkit.agents.killswitch import (
+    emit_human_override,
     halt_correlation,
     quarantine_source,
-    emit_human_override,
 )
+from agentic_loopkit import Event, EventBus, TrustLevel
+from agentic_loopkit.events.store import load_events
 
 
 def make_governance_event(

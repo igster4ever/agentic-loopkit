@@ -12,8 +12,7 @@ from starlette.testclient import TestClient
 
 from agentic_loopkit.bus import EventBus
 from agentic_loopkit.dashboard import create_app
-from agentic_loopkit.events.models import Event, WILDCARD_STREAM
-
+from agentic_loopkit.events.models import WILDCARD_STREAM, Event
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

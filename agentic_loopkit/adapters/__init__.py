@@ -1,8 +1,8 @@
 from .base import PollingAdapter
 from .clickup import ClickUpAdapter, ClickUpEventType
+from .community import CommunityEventType, CommunityFeedAdapter
+from .git import GitEventType, LocalGitAdapter
 from .slack import SlackAdapter, SlackEventType
-from .git import LocalGitAdapter, GitEventType
-from .community import CommunityFeedAdapter, CommunityEventType
 
 __all__ = [
     "PollingAdapter",

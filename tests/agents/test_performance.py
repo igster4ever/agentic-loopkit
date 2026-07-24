@@ -2,8 +2,9 @@
 Tests for PerformanceMeasure protocol and SimpleConfidencePerformance.
 """
 import pytest
+
+from agentic_loopkit.agents.performance import PerformanceMeasure, SimpleConfidencePerformance
 from agentic_loopkit.events.models import Event, EventMeta
-from agentic_loopkit.agents.performance import PerformanceMeasure, PerformanceScore, SimpleConfidencePerformance
 
 
 def make_event(source="agent-a", event_type="work.done", confidence=None, stream=None):

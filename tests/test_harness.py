@@ -1,14 +1,11 @@
-import pytest
-from pathlib import Path
-from agentic_loopkit import Event, AgentBase
+from agentic_loopkit import AgentBase, Event
 from agentic_loopkit.testing import (
     AgentTestHarness,
-    TestTask,
+    AsyncLLMCallable,
     TestResult,
     TestSuiteResult,
-    AsyncLLMCallable,
+    TestTask,
 )
-
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 

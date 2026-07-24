@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock
 
-from agentic_loopkit import Event, EventBus, TrustLevel, SystemEventType
-from agentic_govkit import GovernanceLearningAgent, GovernanceEventType, PolicyRecommendation
+import pytest
 
+from agentic_govkit import GovernanceEventType, GovernanceLearningAgent, PolicyRecommendation
+from agentic_loopkit import Event, EventBus, SystemEventType, TrustLevel
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -300,6 +300,7 @@ async def test_evidence_event_ids_in_payload(tmp_path):
 def test_module_boundary_learning_agent_imports_only_public_loopkit_api():
     """GovernanceLearningAgent must only import from agentic_loopkit public API."""
     import inspect
+
     import agentic_govkit.agents.learning as learning_module
 
     source = inspect.getsource(learning_module)

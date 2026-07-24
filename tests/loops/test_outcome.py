@@ -18,13 +18,11 @@ Covers:
   - Final result preserves original artifact output (not gap-feedback string)
 """
 
-import pytest
 from agentic_loopkit.bus import EventBus
-from agentic_loopkit.loops.ralf import RALFResult, CONFIDENCE_LOW
-from agentic_loopkit.loops.outcome import OutcomeExecutor
 from agentic_loopkit.events.models import Event
 from agentic_loopkit.events.store import load_events
-
+from agentic_loopkit.loops.outcome import OutcomeExecutor
+from agentic_loopkit.loops.ralf import RALFResult
 
 _RUBRIC = "## Test Rubric\n- Output must equal 'done'\n"
 

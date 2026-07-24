@@ -1,8 +1,7 @@
-import pytest
 from agentic_loopkit.bus import EventBus
-from agentic_loopkit.loops.react import ReActExecutor, ReActResult, ReActStep
 from agentic_loopkit.events.models import Event
 from agentic_loopkit.events.store import load_events
+from agentic_loopkit.loops.react import ReActExecutor, ReActResult, ReActStep
 
 
 def make_event(**kwargs) -> Event:

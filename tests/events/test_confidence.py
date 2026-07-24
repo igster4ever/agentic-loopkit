@@ -1,7 +1,7 @@
 import pytest
 
-from agentic_loopkit.events.models import Event, EventMeta, TrustLevel
 from agentic_loopkit.events.confidence import aggregate_confidence
+from agentic_loopkit.events.models import Event, EventMeta, TrustLevel
 
 
 def _event(confidence=None, trust=TrustLevel.MEDIUM, depth=0):

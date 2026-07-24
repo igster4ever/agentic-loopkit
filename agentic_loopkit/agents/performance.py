@@ -16,7 +16,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from ..utils.time import utc_now, iso_format
+from ..utils.time import iso_format, utc_now
 
 if TYPE_CHECKING:
     from ..events.models import Event

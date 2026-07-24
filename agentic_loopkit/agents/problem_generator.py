@@ -41,7 +41,7 @@ from enum import StrEnum
 from typing import Any, Optional
 
 from ..events.models import Event, EventMeta
-from ..events.store import load_all_events, load_events
+from ..events.store import load_all_events
 from .base import AgentBase
 
 

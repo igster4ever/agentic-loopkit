@@ -1,10 +1,8 @@
-import pytest
-from agentic_loopkit.bus import EventBus
 from agentic_loopkit.events.models import Event
 from agentic_loopkit.loops.skillopt import (
-    SkillOptExecutor,
-    SkillEdit,
     RejectedEdit,
+    SkillEdit,
+    SkillOptExecutor,
     SkillOptResult,
     _apply_edits,
     _is_protected,

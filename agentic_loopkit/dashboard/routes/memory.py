@@ -16,9 +16,9 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from ...bus import EventBus
 from ..constants import DEFAULT_LIMIT, MAX_LIMIT
 from ..dependencies import get_bus
-from ...bus import EventBus
 
 log = logging.getLogger("agentic_loopkit.dashboard.routes.memory")
 router = APIRouter()

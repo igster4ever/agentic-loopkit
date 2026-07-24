@@ -31,14 +31,14 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
+from .events.headlines import EventHeadline, append_headline, expand_event, load_headlines
 from .events.models import Event, SystemEventType
 from .events.router import EventRouter
 from .events.store import append_event, compact_stream
-from .events.headlines import EventHeadline, append_headline, load_headlines, expand_event
 
 if TYPE_CHECKING:
-    from .agents.base import AgentBase
     from .adapters.base import PollingAdapter
+    from .agents.base import AgentBase
 
 log = logging.getLogger("agentic_loopkit.bus")
 

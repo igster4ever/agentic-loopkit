@@ -35,9 +35,8 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from agentic_loopkit import AgentBase, Event, EventMeta, TrustLevel
 from agentic_govkit.events.models import GovernanceEventType
-
+from agentic_loopkit import AgentBase, Event, EventMeta, TrustLevel
 
 # ── Enforcement action type ───────────────────────────────────────────────────
 

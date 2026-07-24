@@ -16,8 +16,8 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Optional
 
-from .models import Event, WILDCARD_STREAM
 from ..utils.time import utc_now
+from .models import WILDCARD_STREAM, Event
 
 log = logging.getLogger("agentic_loopkit.store")
 

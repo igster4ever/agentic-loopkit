@@ -12,8 +12,8 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from agentic_loopkit import OutcomeExecutor, RALFResult, Event
 from agentic_govkit.events.models import GovernanceEventType
+from agentic_loopkit import Event, OutcomeExecutor, RALFResult
 
 log = logging.getLogger("agentic_govkit.consensus")
 

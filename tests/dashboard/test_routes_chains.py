@@ -2,9 +2,8 @@
 tests/dashboard/test_routes_chains.py — GET /api/chains/{correlation_id}
 """
 
-import pytest
-from pathlib import Path
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
+
 from agentic_loopkit.bus import EventBus
 from agentic_loopkit.dashboard import create_app
 from agentic_loopkit.dashboard.routes.chains import _build_edges, _build_summary

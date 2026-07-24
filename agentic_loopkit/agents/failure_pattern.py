@@ -35,7 +35,6 @@ from ..events.models import Event, EventMeta, SystemEventType
 from ..events.store import load_all_events
 from .projection import ProjectionAgent
 
-
 # ── Error keyword sets ─────────────────────────────────────────────────────────
 
 _TRIGGER_KEYWORDS: frozenset[str] = frozenset({

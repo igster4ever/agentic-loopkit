@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import logging
 from abc import abstractmethod
-from typing import Any, Optional
+from typing import Any
 
 from ..events.models import Event, SystemEventType
 from .calibration import CalibrationRecord

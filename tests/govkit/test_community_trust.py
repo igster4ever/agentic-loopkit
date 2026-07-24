@@ -13,11 +13,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from agentic_loopkit import Event, TrustLevel
-from agentic_loopkit.bus import EventBus
 from agentic_govkit import AuditAgent, GovernanceEventType
 from agentic_govkit.agents.community_trust import CommunityTrustLearner
-
+from agentic_loopkit import Event, TrustLevel
+from agentic_loopkit.bus import EventBus
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 

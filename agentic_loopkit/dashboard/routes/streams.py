@@ -14,8 +14,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends
 
-from ..dependencies import get_bus
 from ...bus import EventBus
+from ..dependencies import get_bus
 
 log = logging.getLogger("agentic_loopkit.dashboard.routes.streams")
 router = APIRouter()

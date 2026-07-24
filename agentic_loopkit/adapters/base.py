@@ -43,7 +43,7 @@ import logging
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from ..events.models import Event, SystemEventType
 from ..utils.time import iso_format

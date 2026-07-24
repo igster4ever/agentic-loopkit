@@ -33,9 +33,9 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 
-from agentic_loopkit import Event
 from agentic_govkit.agents.learning import GovernanceLearningAgent, PolicyRecommendation
 from agentic_govkit.events.models import GovernanceEventType
+from agentic_loopkit import Event
 
 
 class CommunityTrustLearner(GovernanceLearningAgent):

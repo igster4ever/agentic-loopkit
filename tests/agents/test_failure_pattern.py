@@ -1,8 +1,6 @@
-import pytest
-from agentic_loopkit.agents.failure_pattern import FailurePatternAgent, FailureSignature
+from agentic_loopkit.agents.failure_pattern import FailurePatternAgent
 from agentic_loopkit.bus import EventBus
-from agentic_loopkit.events.models import Event, SystemEventType, TrustLevel
-
+from agentic_loopkit.events.models import Event, SystemEventType
 
 # ── Concrete subclass ──────────────────────────────────────────────────────────
 

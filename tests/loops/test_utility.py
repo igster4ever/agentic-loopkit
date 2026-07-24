@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
-from agentic_loopkit import Event, EventBus, UtilityExecutor, UtilityResult, UtilityCandidate
+import pytest
 
+from agentic_loopkit import Event, EventBus, UtilityCandidate, UtilityExecutor
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

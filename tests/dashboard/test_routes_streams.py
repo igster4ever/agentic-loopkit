@@ -2,10 +2,10 @@
 tests/dashboard/test_routes_streams.py — GET /api/streams
 """
 
-import json
-import pytest
 from pathlib import Path
-from httpx import AsyncClient, ASGITransport
+
+from httpx import ASGITransport, AsyncClient
+
 from agentic_loopkit.bus import EventBus
 from agentic_loopkit.dashboard import create_app
 from agentic_loopkit.events.models import Event

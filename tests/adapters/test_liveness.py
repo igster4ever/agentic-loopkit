@@ -5,9 +5,8 @@ Tests for v4 theme 3 — adapter liveness tracking:
   - liveness_state() snapshot
   - tick registration / release with EventBus
 """
-import pytest
-from agentic_loopkit.bus import EventBus
 from agentic_loopkit.adapters.base import PollingAdapter
+from agentic_loopkit.bus import EventBus
 from agentic_loopkit.events.models import Event, SystemEventType
 from agentic_loopkit.events.store import load_events
 
