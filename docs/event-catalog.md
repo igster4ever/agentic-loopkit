@@ -75,10 +75,24 @@ defined in `events/models.py` and exported from the public API.
 | `harness.edit_accepted` | `SelfHarnessExecutor` | Passed `AgentTestHarness.regression_gate()` | operators, governance stream |
 | `harness.edit_rejected` | `SelfHarnessExecutor` | Failed regression gate or max_iterations reached | audit log |
 | `harness.candidate_eval` | `SelfHarnessExecutor` | Per-candidate test result (reserved for dashboard use) | audit log, dashboard |
+| `harness.harness_adapted` | `SelfHarnessExecutor` | Phase-B adaptation (P71) fired — see below | audit log, dashboard |
 
 Payload for `harness.edit_accepted`: `best_skill` (optimised skill text), `selection_score` (float),
 `epochs` (int). Payload for `harness.edit_rejected`: `reason` (step_summary string). Both carry
 `_meta` with `loop_type="self_harness"`.
+
+**`harness.harness_adapted` (P71, MemoHarness arXiv:2607.14159 §2.6 — test-time case
+adaptation without feedback)**: emitted on the first outer iteration of a `SelfHarnessExecutor.run()`
+call, before the `SkillOptExecutor` (Phase-A search) is invoked. `SelfHarnessExecutor._compute_adaptation()`
+filters this run's `system.failure_pattern_detected`-derived trajectories to those whose
+`agent_mechanism` matches the executor's own name, clusters by `terminal_cause`, and — if a
+cluster's count exceeds `adaptation_threshold` (default 3) and the cause has an entry in the
+deterministic `_ADAPTATION_MAP` lookup — nudges the bounded `train_fraction` parameter for the
+*next* `run()` call and clamps to `[0.5, 0.95]`. No LLM, no retraining, no-op if the clamp
+produces no change. Distinct from `SkillOptExecutor`'s own validation-gated skill-text search
+(Phase A) — this is per-case adaptation of an already-settled configuration (Phase B). Payload:
+`terminal_cause`, `count`, `param` (currently always `"train_fraction"`), `old_value`, `new_value`.
+Carries `_meta` with `loop_type="self_harness"`.
 
 ---
 

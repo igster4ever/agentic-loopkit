@@ -46,10 +46,11 @@ class SystemEventType(StrEnum):
 
 class HarnessEventType(StrEnum):
     """Test-harness lifecycle events emitted by SelfHarnessExecutor.  Stream: 'harness'."""
-    EDIT_PROPOSED  = "harness.edit_proposed"
-    EDIT_ACCEPTED  = "harness.edit_accepted"
-    EDIT_REJECTED  = "harness.edit_rejected"
-    CANDIDATE_EVAL = "harness.candidate_eval"
+    EDIT_PROPOSED   = "harness.edit_proposed"
+    EDIT_ACCEPTED   = "harness.edit_accepted"
+    EDIT_REJECTED   = "harness.edit_rejected"
+    CANDIDATE_EVAL  = "harness.candidate_eval"
+    HARNESS_ADAPTED = "harness.harness_adapted"
 
 
 class LoopType(StrEnum):

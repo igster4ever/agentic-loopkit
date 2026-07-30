@@ -44,6 +44,18 @@ def make_failure_pattern_event(tmp_path: Path) -> Event:
     return e
 
 
+def make_own_failure_trajectory(agent_mechanism: str, terminal_cause: str) -> dict:
+    """A FailureSignature-shaped trajectory dict as produced by retrieve() —
+    used to exercise _compute_adaptation() directly without hitting the store."""
+    return {
+        "outcome":         "failure",
+        "terminal_cause":  terminal_cause,
+        "agent_mechanism": agent_mechanism,
+        "pattern_summary": "",
+        "event_id":        "e1",
+    }
+
+
 def make_suite_result(held_in_pass=2, held_in_total=2, held_out_pass=1, held_out_total=1) -> TestSuiteResult:
     results = []
     for i in range(held_in_total):
@@ -365,4 +377,191 @@ async def test_full_run_max_iterations_emits_rejected(tmp_path):
     assert result.status == "error"
     rejected = [e for e in emitted if e.event_type == HarnessEventType.EDIT_REJECTED]
     assert len(rejected) == 1
+    await bus.stop()
+
+
+# ── Phase-B adaptation (P71) ──────────────────────────────────────────────────
+
+async def test_compute_adaptation_none_when_no_own_trajectories(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    sh = make_self_harness(bus, tmp_path, make_suite_result(), make_suite_result())
+    context = {
+        "train": [make_own_failure_trajectory("some-other-agent", "max_iterations_exceeded")] * 5,
+        "selection": [],
+    }
+    assert sh._compute_adaptation(context) is None
+
+
+async def test_compute_adaptation_none_below_threshold(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    sh = make_self_harness(bus, tmp_path, make_suite_result(), make_suite_result())
+    context = {
+        "train": [make_own_failure_trajectory(sh.name, "max_iterations_exceeded")] * 2,
+        "selection": [],
+    }
+    assert sh._compute_adaptation(context) is None  # default threshold is 3
+
+
+async def test_compute_adaptation_none_for_unmapped_cause(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    sh = make_self_harness(bus, tmp_path, make_suite_result(), make_suite_result())
+    context = {
+        "train": [make_own_failure_trajectory(sh.name, "some_unknown_cause")] * 5,
+        "selection": [],
+    }
+    assert sh._compute_adaptation(context) is None
+
+
+async def test_compute_adaptation_fires_at_threshold(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    sh = make_self_harness(bus, tmp_path, make_suite_result(), make_suite_result())
+    context = {
+        "train": [make_own_failure_trajectory(sh.name, "max_iterations_exceeded")] * 3,
+        "selection": [],
+    }
+    adaptation = sh._compute_adaptation(context)
+    assert adaptation is not None
+    assert adaptation["terminal_cause"] == "max_iterations_exceeded"
+    assert adaptation["count"] == 3
+    assert adaptation["param"] == "train_fraction"
+    assert adaptation["old_value"] == 0.8
+    assert adaptation["new_value"] == 0.75  # -0.05 delta
+
+
+async def test_compute_adaptation_picks_highest_count_cause(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    sh = make_self_harness(bus, tmp_path, make_suite_result(), make_suite_result())
+    context = {
+        "train": (
+            [make_own_failure_trajectory(sh.name, "max_iterations_exceeded")] * 3
+            + [make_own_failure_trajectory(sh.name, "confidence_below_threshold")] * 5
+        ),
+        "selection": [],
+    }
+    adaptation = sh._compute_adaptation(context)
+    assert adaptation["terminal_cause"] == "confidence_below_threshold"
+    assert adaptation["count"] == 5
+
+
+async def test_compute_adaptation_clamps_at_lower_bound(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    sh = make_self_harness(bus, tmp_path, make_suite_result(), make_suite_result())
+    sh._train_fraction = 0.5  # already at floor
+    context = {
+        "train": [make_own_failure_trajectory(sh.name, "max_iterations_exceeded")] * 3,
+        "selection": [],
+    }
+    assert sh._compute_adaptation(context) is None  # would clamp to same value — no-op
+
+
+async def test_act_first_iteration_applies_adaptation_and_emits_event(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    await bus.start()
+
+    sh = make_self_harness(bus, tmp_path, make_suite_result(), make_suite_result())
+    trigger = make_trigger()
+    await sh.retrieve(trigger)  # sets self._trigger_event
+
+    emitted: list[Event] = []
+    from agentic_loopkit.agents.base import AgentBase
+
+    class Collector(AgentBase):
+        async def orient(self, event, context):
+            return {}
+
+        async def decide(self, event, orientation):
+            return orientation
+
+        async def act(self, event, action):
+            emitted.append(event)
+
+    collector = Collector("col", bus)
+    collector.subscribe("harness")
+    bus.register(collector)
+
+    context = {
+        "train": [make_own_failure_trajectory(sh.name, "max_iterations_exceeded")] * 3,
+        "selection": [],
+    }
+    await sh.act(context, None)  # first iteration — prior_result is None
+
+    adapted = [e for e in emitted if e.event_type == HarnessEventType.HARNESS_ADAPTED]
+    assert len(adapted) == 1
+    assert adapted[0].payload["old_value"] == 0.8
+    assert adapted[0].payload["new_value"] == 0.75
+    assert adapted[0].causation_id == trigger.event_id
+    assert sh._train_fraction == 0.75
+    await bus.stop()
+
+
+async def test_act_second_iteration_does_not_reapply_adaptation(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    await bus.start()
+
+    sh = make_self_harness(bus, tmp_path, make_suite_result(), make_suite_result())
+    await sh.retrieve(make_trigger())
+
+    emitted: list[Event] = []
+    from agentic_loopkit.agents.base import AgentBase
+
+    class Collector(AgentBase):
+        async def orient(self, event, context):
+            return {}
+
+        async def decide(self, event, orientation):
+            return orientation
+
+        async def act(self, event, action):
+            emitted.append(event)
+
+    collector = Collector("col", bus)
+    collector.subscribe("harness")
+    bus.register(collector)
+
+    context = {
+        "train": [make_own_failure_trajectory(sh.name, "max_iterations_exceeded")] * 3,
+        "selection": [],
+    }
+    prior = await sh.act(context, None)   # iteration 1 — applies once
+    await sh.act(context, prior)          # iteration 2 — prior_result is not None, skipped
+
+    adapted = [e for e in emitted if e.event_type == HarnessEventType.HARNESS_ADAPTED]
+    assert len(adapted) == 1
+    assert sh._train_fraction == 0.75  # not double-applied
+    await bus.stop()
+
+
+async def test_harness_adapted_meta_present(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    await bus.start()
+
+    sh = make_self_harness(bus, tmp_path, make_suite_result(), make_suite_result())
+    await sh.retrieve(make_trigger())
+
+    emitted: list[Event] = []
+    from agentic_loopkit.agents.base import AgentBase
+
+    class Collector(AgentBase):
+        async def orient(self, event, context):
+            return {}
+
+        async def decide(self, event, orientation):
+            return orientation
+
+        async def act(self, event, action):
+            emitted.append(event)
+
+    collector = Collector("col", bus)
+    collector.subscribe("harness")
+    bus.register(collector)
+
+    context = {
+        "train": [make_own_failure_trajectory(sh.name, "confidence_below_threshold")] * 3,
+        "selection": [],
+    }
+    await sh.act(context, None)
+
+    adapted = [e for e in emitted if e.event_type == HarnessEventType.HARNESS_ADAPTED][0]
+    assert adapted.meta() is not None
+    assert adapted.meta()["loop_type"] == "self_harness"
     await bus.stop()
