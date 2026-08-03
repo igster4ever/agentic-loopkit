@@ -33,7 +33,7 @@ from enum import StrEnum
 from typing import Any, Optional
 
 from ..events.confidence import aggregate_confidence
-from ..events.models import Event, EventMeta
+from ..events.models import Event, EventMeta, LoopType
 from ..events.store import load_all_events, load_events
 from .base import AgentBase
 
@@ -146,7 +146,7 @@ class ProjectionAgent(AgentBase):
                     "streams":       streams,
                     "_meta": EventMeta(
                         phase="orient",
-                        loop_type="ooda",
+                        loop_type=LoopType.OODA,
                         confidence=confidence,
                         context=(
                             f"Projection '{self.name}': "

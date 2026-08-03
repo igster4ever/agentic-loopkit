@@ -40,7 +40,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Optional
 
-from ..events.models import Event, EventMeta
+from ..events.models import Event, EventMeta, LoopType
 from ..events.store import load_all_events
 from .base import AgentBase
 
@@ -151,7 +151,7 @@ class ProblemGeneratorAgent(AgentBase):
                         "ttl_hours":       item.ttl_hours,
                         "_meta": EventMeta(
                             phase="orient",
-                            loop_type="ooda",
+                            loop_type=LoopType.OODA,
                             confidence=item.priority,
                             context=(
                                 f"Exploration pass — {count} agenda item(s) "

@@ -323,12 +323,14 @@ event count* for a stream, not a bounded window — the real latency-growth risk
 for a long-running deployment (a 2026-07-21 spike found the linear-scan cost
 itself negligible at realistic scale; unbounded growth was the actual gap).
 
-`EventBus` now owns an opt-in background compaction loop:
+`EventBus` now owns a background compaction loop, **on by default** since
+2026-08-03 (24h interval) — pass `compaction_interval_hours=None` explicitly to
+restore unlimited retention:
 
 ```python
 bus = EventBus(
     store_dir=Path("~/.cache/my-app"),
-    compaction_interval_hours=24,       # None (default) = disabled
+    compaction_interval_hours=24,       # default; None = disabled (old behaviour)
     compaction_retention_hours=72,      # None = compact_stream()'s own default
 )
 await bus.start()   # background asyncio task compacts every stream on interval

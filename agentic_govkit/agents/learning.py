@@ -52,7 +52,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from agentic_govkit.events.models import GovernanceEventType
-from agentic_loopkit import AgentBase, Event, EventMeta, TrustLevel, load_events
+from agentic_loopkit import AgentBase, Event, EventMeta, LoopType, TrustLevel, load_events
 
 
 @dataclass
@@ -201,7 +201,7 @@ class GovernanceLearningAgent(AgentBase):
                         "tags":                rec.tags,
                         "_meta": EventMeta(
                             phase="orient",
-                            loop_type="ooda",
+                            loop_type=LoopType.OODA,
                             confidence=rec.confidence,
                             context=(
                                 f"Governance learning: {count} recommendation(s) "

@@ -28,9 +28,7 @@ _MAX_LIMIT     = MAX_LIMIT
 
 
 def _get_store(bus: EventBus):
-    try:
-        return bus.memory
-    except AttributeError:
+    if bus.memory is None:
         raise HTTPException(
             status_code=503,
             detail=(
@@ -38,6 +36,7 @@ def _get_store(bus: EventBus):
                 "at startup before using /api/memory routes."
             ),
         )
+    return bus.memory
 
 
 @router.get("/memory")

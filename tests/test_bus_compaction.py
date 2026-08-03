@@ -62,10 +62,17 @@ async def test_compact_all_streams_respects_custom_retention(tmp_path):
 
 # ── Background loop wiring ────────────────────────────────────────────────────
 
-async def test_compaction_task_not_started_when_interval_unset(tmp_path):
-    bus = EventBus(store_dir=tmp_path)
+async def test_compaction_task_not_started_when_interval_explicitly_none(tmp_path):
+    bus = EventBus(store_dir=tmp_path, compaction_interval_hours=None)
     await bus.start()
     assert bus._compaction_task is None
+    await bus.stop()
+
+
+async def test_compaction_task_started_by_default(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    await bus.start()
+    assert bus._compaction_task is not None
     await bus.stop()
 
 

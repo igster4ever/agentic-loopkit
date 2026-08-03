@@ -90,9 +90,9 @@ class SimpleConfidencePerformance(PerformanceMeasure):
         agent_events = [e for e in events if e.source == agent_name]
 
         confidences: list[float] = [
-            e.meta()["confidence"]
+            m["confidence"]
             for e in agent_events
-            if e.meta() and "confidence" in e.meta()
+            if (m := e.meta()) and "confidence" in m
         ]
         mean_conf = sum(confidences) / len(confidences) if confidences else None
 

@@ -22,7 +22,7 @@ from __future__ import annotations
 from typing import Any
 
 from agentic_govkit.events.models import GovernanceEventType
-from agentic_loopkit import WILDCARD_STREAM, AgentBase, Event, EventMeta, TrustLevel
+from agentic_loopkit import WILDCARD_STREAM, AgentBase, Event, EventMeta, LoopType, TrustLevel
 
 
 class AuditAgent(AgentBase):
@@ -118,7 +118,7 @@ class AuditAgent(AgentBase):
                         **extra,
                         "_meta": EventMeta(
                             phase="act",
-                            loop_type="ooda",
+                            loop_type=LoopType.OODA,
                             context=f"Governance audit: {detail}",
                         ).to_dict(),
                     },

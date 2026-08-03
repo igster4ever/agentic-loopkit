@@ -29,7 +29,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from .events.headlines import EventHeadline, append_headline, expand_event, load_headlines
 from .events.models import Event, SystemEventType
@@ -58,7 +58,7 @@ class EventBus:
         store_dir: Optional[Path] = None,
         backpressure_threshold: int = 100,
         drain_timeout: float = 5.0,
-        compaction_interval_hours: Optional[float] = None,
+        compaction_interval_hours: Optional[float] = 24.0,
         compaction_retention_hours: Optional[int] = None,
     ) -> None:
         self.store_dir: Path = (store_dir or _DEFAULT_STORE).expanduser()
@@ -73,14 +73,24 @@ class EventBus:
         self._stopping              = False
         self._active_ticks          = 0   # ticks currently in-flight
 
-        # Compaction: opt-in periodic background task (None = disabled — the
-        # historical default; compact_stream() otherwise has no caller outside
-        # tests, so lifetime event count grows unboundedly for long-running
-        # deployments). compaction_retention_hours=None defers to compact_stream()'s
-        # own default retention window.
+        # Compaction: periodic background task, ON by default (24h interval) since
+        # 2026-08-03 — code review flagged that load_events()/load_all_events() are
+        # an unindexed full linear scan per call, so unbounded lifetime growth makes
+        # every read progressively slower for long-running deployments. Pass
+        # compaction_interval_hours=None explicitly to restore the old unlimited-
+        # retention behaviour. compaction_retention_hours=None defers to
+        # compact_stream()'s own default retention window (72h).
         self.compaction_interval_hours  = compaction_interval_hours
         self.compaction_retention_hours = compaction_retention_hours
         self._compaction_task: Optional[asyncio.Task] = None
+
+        # Optional semantic memory store. None until agentic-memorykit's
+        # patch_bus(bus) sets it at startup — a deliberate external monkey-patch
+        # rather than a hard dependency here, consistent with the "zero runtime
+        # deps" rule. Declared here (rather than left as a missing attribute) so
+        # dashboard/routes/memory.py can check `bus.memory is None` instead of
+        # catching AttributeError, and so mypy sees a real attribute.
+        self.memory: Optional[Any] = None
 
     # ── Registration ───────────────────────────────────────────────────────────
 
@@ -103,12 +113,17 @@ class EventBus:
         Writing to the JSONL store before router fanout means a restart can
         replay missed events from disk — the bus never loses an event silently.
 
+        The disk writes run via ``asyncio.to_thread`` — ``append_event``/
+        ``append_headline`` are plain synchronous file I/O, and calling them
+        directly on the event loop thread would block every concurrent
+        agent/adapter for the duration of each write.
+
         Backpressure: every ``backpressure_threshold`` non-system events a
         ``system.bus_pressure`` event is emitted.  System events are excluded
         from the count so the pressure signal cannot trigger itself.
         """
-        append_event(event, store_dir=self.store_dir)
-        append_headline(event, store_dir=self.store_dir)
+        await asyncio.to_thread(append_event, event, self.store_dir)
+        await asyncio.to_thread(append_headline, event, self.store_dir)
         await self.router.publish(event)
         if event.stream != "system":
             self._event_counter += 1
@@ -208,6 +223,8 @@ class EventBus:
         loop is sufficient here — no external scheduler/cron dependency needed,
         since the bus already owns an event loop for its entire lifetime.
         """
+        if self.compaction_interval_hours is None:
+            return
         interval_seconds = self.compaction_interval_hours * 3600
         while True:
             try:

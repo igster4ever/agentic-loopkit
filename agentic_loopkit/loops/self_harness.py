@@ -36,13 +36,12 @@ from __future__ import annotations
 
 from typing import Any, Callable, Optional
 
-from ..events.models import Event, EventMeta, HarnessEventType, SystemEventType
+from ..events.models import Event, EventMeta, HarnessEventType, LoopType, SystemEventType
 from ..events.store import load_all_events
 from ..testing import AgentTestHarness, TestSuiteResult, TestTask
 from .outcome import OutcomeExecutor
 from .ralf import RALFResult
 from .skillopt import SkillOptExecutor, SkillOptResult
-
 
 # Deterministic terminal_cause → bounded train_fraction delta (P71). Practical
 # heuristics, not a learned controller — MemoHarness §2.6 / Appendix B. Only
@@ -263,7 +262,7 @@ class SelfHarnessExecutor(OutcomeExecutor):
                     **adaptation,
                     "_meta": EventMeta(
                         phase="act",
-                        loop_type="self_harness",
+                        loop_type=LoopType.SELF_HARNESS,
                         confidence=1.0,
                         context=(
                             f"SelfHarness adapted {adaptation['param']}: "
@@ -325,7 +324,7 @@ class SelfHarnessExecutor(OutcomeExecutor):
                     "epochs":          artifact.epoch,
                     "_meta": EventMeta(
                         phase="act",
-                        loop_type="self_harness",
+                        loop_type=LoopType.SELF_HARNESS,
                         confidence=1.0,
                         context=(
                             f"SelfHarness: skill accepted — "
@@ -342,7 +341,7 @@ class SelfHarnessExecutor(OutcomeExecutor):
                 "reason": result.step_summary,
                 "_meta": EventMeta(
                     phase="act",
-                    loop_type="self_harness",
+                    loop_type=LoopType.SELF_HARNESS,
                     confidence=result.confidence,
                     context=f"SelfHarness: skill rejected — {result.step_summary}",
                 ).to_dict(),

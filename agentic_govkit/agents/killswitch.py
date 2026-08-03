@@ -36,7 +36,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from agentic_govkit.events.models import GovernanceEventType
-from agentic_loopkit import AgentBase, Event, EventMeta, TrustLevel
+from agentic_loopkit import AgentBase, Event, EventMeta, LoopType, TrustLevel
 
 # ── Enforcement action type ───────────────────────────────────────────────────
 
@@ -72,7 +72,7 @@ def _build_enforcement_event(
             "triggered_by": str(trigger_event.event_type),
             "_meta": EventMeta(
                 phase="act",
-                loop_type="ooda",
+                loop_type=LoopType.OODA,
                 context=context,
             ).to_dict(),
         },

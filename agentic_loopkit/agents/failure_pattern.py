@@ -31,7 +31,7 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from ..events.models import Event, EventMeta, SystemEventType
+from ..events.models import Event, EventMeta, LoopType, SystemEventType
 from ..events.store import load_all_events
 from .projection import ProjectionAgent
 
@@ -162,7 +162,7 @@ class FailurePatternAgent(ProjectionAgent):
                         "pattern_summary": sig.pattern_summary,
                         "_meta": EventMeta(
                             phase="act",
-                            loop_type="ooda",
+                            loop_type=LoopType.OODA,
                             context=(
                                 f"FailurePattern '{sig.terminal_cause}' via "
                                 f"'{sig.agent_mechanism}': {sig.count} event(s) "
