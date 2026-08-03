@@ -1,6 +1,6 @@
 # NOOA (NVIDIA Object-Oriented Agents) Carryforward — agentic-loopkit
 
-**Status:** Design doc only — nothing implemented yet. One item (P72a) is scoped to design + audit; the sandboxed-CodeAct idea is explicitly deferred, not queued.
+**Status:** Design doc only — nothing implemented yet. P72a's audit (Step 0) and design scoping are now complete — see `docs/memorykit-design.md`'s "P72a — NOOA-inspired verb & consolidation extension" section for the audit findings and proposed extension shape. The sandboxed-CodeAct idea is explicitly deferred, not queued.
 **Source:** Furgale, Klingler, Nolan, et al., "NVIDIA-labs OO Agents: Native Python Object-Oriented Agents" (arXiv:2607.20709v1, 22 Jul 2026).
 **Master doc:** none yet — this is loopkit-specific; promote a cross-project summary to `~/.claude/skills/compass/docs/` only if the memorykit item below turns out to generalise to other namespaces (e.g. `agentic-memorykit`).
 
@@ -30,13 +30,15 @@ NOOA's memory subsystem (`MemoryManager.install(agent)`) gives the model seven c
 
 Loopkit's `agent.recall()` is read-only and iterative (query → steps → results); there's no `forget`/`associate`/`deref` triad, no distinction between deliberate and spontaneous recall, and no consolidation pass. `AgentState.procedural` is reserved-but-unused, which is the natural home for "the store's own state" if a consolidation pass is added later.
 
-### Audit before building
+### Audit before building — complete (2026-08-03)
 
-Per this repo's established discipline (see `docs/mem-harness-carryforward.md`'s Step 0), confirm before scoping implementation:
+Per this repo's established discipline (see `docs/mem-harness-carryforward.md`'s Step 0), confirmed before scoping implementation:
 
-1. What does memorykit (the sibling package, not yet vendored into this repo per `CLAUDE.md`'s "no hard dep" note) actually expose for *writes*, today — is there already a `remember()`-equivalent, or is `save_state()` the only write path?
-2. Does anything already distinguish a deliberate-recall read from a context-injection read, or would every `recall()` call currently count toward whatever usage/importance signal exists?
-3. Is there a scheduling point that already resembles "after a task completes or while idle" (e.g. a `learn()` hook, an executor's terminal state) that a consolidation pass could hang off, or would this need new scaffolding in the bus/executor lifecycle?
+1. **`save_state()` already writes via `_memory_store.write(...)`** for semantic/world_model facts. Memorykit's own design already specifies `forget()` (soft-delete by key+agent) — it's designed, just unwired from `AgentBase`. So `remember`/`forget` are not new memorykit APIs; `write()`/`forget()` already cover them.
+2. **Nothing distinguishes deliberate from injected recall.** `recall()` and `load_state()`'s `list()` call are the only two read paths, both explicit. No `BeforeTurn`-equivalent hook exists — OODA has no per-turn concept structurally equivalent to a CodeAct loop's turn boundary.
+3. **`RALFExecutor.learn()` and `AgentBase.save_state()`** are the closest fit to "after a task completes" — loopkit has no idle-detection primitive at all, so "while idle" has no analogue and is out of scope.
+
+Full extension shape (what's new vs. what memorykit already covers, plus the proposed `associate()`/`deref()`/`consolidate()` additions) is scoped in `docs/memorykit-design.md`'s "P72a" section — not repeated here to avoid drift between two copies of the same design.
 
 ### Explicitly out of scope for this item
 
@@ -49,7 +51,7 @@ Per this repo's established discipline (see `docs/mem-harness-carryforward.md`'s
 
 NOOA's pass-by-reference design (§3.2) renders large arguments as a compact preview — concrete type, true length, head/tail sample (e.g. `records = list(len=100, [:5]=[42, 17, 89, 33, 8], [-5:]=[56, 71, 12, 45, 28])`) — rather than serializing the full value into the prompt, while the underlying variable stays fully intact in the execution environment. `headlines.py` already does the analogous thing at the *event* granularity (LCLM-inspired skim/expand), but nothing today truncates an individual large payload *value* before it lands in `EventMeta.context` or a dashboard `_meta.context` render.
 
-Worth a small, self-contained helper (`agentic_loopkit/utils/preview.py`?) if any executor or the dashboard starts handling genuinely large field values — not urgent today since nothing in the current codebase was observed constructing oversized single-field payloads. Flagging so it's not rediscovered from scratch later.
+**Go/no-go check — resolved (2026-08-03): no-go for now.** Grepped every `EventMeta(context=...)` construction site (`events/models.py`, `loops/self_harness.py` ×3, `agents/{problem_generator,projection,failure_pattern}.py`) — all pass short, hand-written f-string summaries, never a raw dump of a large collection or object. `headlines.py` already truncates at the event level (`_MAX_HEADLINE`, summary-field truncation to 120 chars). Dashboard routes don't serialize raw payload values into a prompt context anywhere (only `chains.py` references `payload["_meta"]["loop_type"]`, a scalar). No current call site would benefit from a preview helper — confirms the original assessment. Left as a flagged idea, not a ticket; re-check if any executor starts handling genuinely large field values (e.g. a future CodeAct-adjacent executor, if that ever gets built).
 
 ---
 

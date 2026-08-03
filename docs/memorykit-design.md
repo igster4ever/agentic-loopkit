@@ -299,3 +299,44 @@ from agentic_memorykit.loopkit import MemoryAdapter
 3. **Memory expiry** — `MemoryRecord.expires_at: str | None` (ISO 8601 UTC). Expired records are excluded from `query()` and `list()` results by default but preserved in JSONL for audit. Agents set `expires_at` explicitly when writing; no system-level TTL enforcement daemon. A `purge_expired()` maintenance method handles physical cleanup on demand.
 
 4. **Dashboard integration** — extend the existing loopkit dashboard via the `[loopkit]` extra. Adds `GET /api/memory`, `GET /api/memory/{agent_id}`, `GET /api/memory/{agent_id}/{key}/history` to the FastAPI backend, plus a Memory page in the React UI. Surfaced in the same sidebar as Streams, Events, Agents, Adapters.
+
+---
+
+## P72a — NOOA-inspired verb & consolidation extension
+
+_Carried forward from `docs/nooa-oo-agents-carryforward.md` (NVIDIA NOOA, arXiv:2607.20709). Scoped 2026-08-03 after the Step 0 audit below — this section is design-only, nothing implemented._
+
+### Step 0 audit findings (loopkit side)
+
+Confirmed by reading `agentic_loopkit/agents/base.py`:
+
+1. **Write path already exists.** `AgentBase.save_state()` calls `_memory_store.write(key, value, agent_id=self.name, tags=[...])` for semantic and world_model facts. This repo's own design (above) already specifies `forget()` (soft-delete by key+agent) — it's designed, just never called from `AgentBase`. So NOOA's `remember`/`forget` verbs are **not a new memorykit API** — `write()`/`forget()` already cover them; the gap is that `AgentBase` never calls `forget()`.
+2. **No deliberate-vs-spontaneous distinction.** `recall()` (P46, wraps `query_iterative()`) and `load_state()`'s direct `list()` call are the only two read paths, and both are explicit, deliberate calls made by agent code. There is no injection mechanism and nothing resembling NOOA's `BeforeTurn` hook — loopkit's OODA pipeline (`observe`/`orient`/`decide`/`act`) has no per-turn concept structurally equivalent to a CodeAct loop's turn boundary.
+3. **No idle hook; task-completion hook exists.** Loopkit is reactive/event-driven with no idle-detection primitive — there is no analogue to "while the agent is idle." `RALFExecutor.learn()` (fires after every iteration) and `AgentBase.save_state()` are the closest fit to NOOA's "after a task completes."
+
+### What's actually new vs. memorykit's existing design
+
+| NOOA capability | Memorykit status |
+|---|---|
+| `remember` | Already covered by `write()` — no new API |
+| `forget` | Already designed (`forget()`, soft-delete) — needs wiring into `AgentBase`, not a new memorykit method |
+| `search` / `recall` | Already covered by `query()` / `query_iterative()` |
+| `update_memory` | Already covered by `write()`'s reconciliation (conflict → UPDATE) |
+| `associate` | **New.** No typed cross-reference concept exists in `MemoryRecord` today. |
+| `deref` | **New.** No mechanism resolves a reference against live agent state at recall time. |
+| Deliberate vs. spontaneous recall, unreinforced injection | **New.** Requires an injection path that does not count toward whatever usage/importance signal is added. |
+| Async reflection/consolidation (merge, re-score, prune, distil) | **New**, but shaped like `MemoryStore.compact()`/`purge_expired()` (already resolved design decisions above) — a `consolidate()` maintenance method is the natural sibling, not a new subsystem. |
+
+### Proposed extension shape (not yet implemented)
+
+- **`MemoryRecord.refs: dict[str, str]`** (optional, default `{}`) — typed references (`kind:key` pairs) resolved against live `MemoryStore` state at recall time via a new `MemoryStore.deref(record) -> dict[str, MemoryRecord | None]`. Mirrors NOOA's "recall does not answer from stale copies."
+- **`MemoryStore.associate(memory_id: str, ref_key: str, ref_kind: str) -> None`** — attaches a typed reference to an existing record. Pure bookkeeping, no reconciliation logic needed (append-only, same as every other write).
+- **Wire `forget()` into `AgentBase`** — currently unreachable from agent code; expose as `agent.forget(key: str) -> bool` alongside the existing `recall()`.
+- **Injection without reinforcement**: `agent.recall()` already increments nothing today (no usage/importance signal exists yet), so this is deferred until memorykit adds an importance/weight field to `MemoryRecord` — premature to build the "don't count as a reinforcing read" guarantee before there's a signal it could distort.
+- **`MemoryStore.consolidate(agent_id: str) -> ConsolidationReport`** — run manually (via a session-end hook, e.g. wired into `RALFExecutor.learn()` for the terminal iteration) rather than on an idle timer that doesn't exist in loopkit's reactive model. Scope: merge near-duplicate keys (already partially covered by the fuzzy near-duplicate reconciliation step above), re-score confidence, and mark long-`expires_at`-free records for review. Explicitly **not** in scope yet: episode distillation into higher-level records — that requires an episodic memory implementation loopkit doesn't have (`AgentState.episodic` is currently always `[]` in the base implementation).
+
+### Explicitly deferred
+
+- Any consolidation trigger resembling "while idle" — no primitive exists to detect idleness in an event-driven bus; would need a new scheduling concept unrelated to this item's scope.
+- Importance/weight scoring on `MemoryRecord` — needed before the deliberate-vs-spontaneous distinction can mean anything, but is a memorykit-side data model change, not an `AgentBase` change, and out of scope for this pass.
+- Episode distillation — blocked on `AgentState.episodic` actually being populated somewhere; currently always empty in the base implementation.
