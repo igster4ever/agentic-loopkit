@@ -106,3 +106,15 @@ async def test_recall_evidence_conditioning_uses_real_saved_state_tags(tmp_path)
     # Real content vocabulary from the keys, not just the structural tag
     assert all_evidence_tags & {"adapter", "error", "pattern"}
     assert all_evidence_tags != {"semantic"}
+
+
+async def test_forget_deletes_fact_from_real_memory_store(tmp_path):
+    bus = EventBus(store_dir=tmp_path / "events")
+    agent = RememberingAgent("rememberer", bus)
+    agent._memory_store = MemoryStore(store_dir=tmp_path / "memory")
+
+    await agent.save_state(AgentState(semantic={"stale_fact": "outdated value"}))
+    assert await agent.forget("stale_fact") is True
+
+    state = await agent.load_state()
+    assert "stale_fact" not in state.semantic

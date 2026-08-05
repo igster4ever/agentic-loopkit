@@ -99,6 +99,9 @@ class RALFExecutor(ABC):
     def __init__(self, name: str, bus: "EventBus") -> None:
         self.name = name
         self._bus = bus
+        # Optional agentic_memorykit store — set externally; no hard dep.
+        # Mirrors AgentBase._memory_store; drives _consolidate_hook() below.
+        self._memory_store: Any = None
 
     # ── RALF phases ────────────────────────────────────────────────────────────
 
@@ -153,6 +156,38 @@ class RALFExecutor(ABC):
         the result.
         """
         return result
+
+    # ── Memory consolidation hook (P72a) ────────────────────────────────────────
+
+    async def _consolidate_hook(self, result: RALFResult) -> None:
+        """
+        Called once after the loop terminates (before follow_up()), if a
+        _memory_store is wired. Calls _memory_store.consolidate(agent_id=self.name)
+        and surfaces any candidates via on_consolidation_candidates() — never
+        auto-applies merges. consolidate() is itself non-mutating by design
+        (agentic_memorykit's BaseStore.consolidate() returns candidates only;
+        apply_merge() is the separate, deciding step) — matching that contract
+        here keeps merge decisions observable rather than silent.
+        Default: no-op if no _memory_store is wired.
+        """
+        if self._memory_store is None:
+            return
+        consolidation = await self._memory_store.consolidate(agent_id=self.name)
+        if consolidation.candidates:
+            await self.on_consolidation_candidates(consolidation.candidates)
+
+    async def on_consolidation_candidates(self, candidates: list[Any]) -> None:
+        """
+        Override to act on merge candidates surfaced by _consolidate_hook().
+        Default: log only — never applies merges. Call
+        self._memory_store.apply_merge(candidate) explicitly from an override
+        to actually merge.
+        """
+        log.info(
+            "[%s] %d memory consolidation candidate(s) found — "
+            "override on_consolidation_candidates() to act on them",
+            self.name, len(candidates),
+        )
 
     # ── Loop runner ────────────────────────────────────────────────────────────
 
@@ -215,6 +250,8 @@ class RALFExecutor(ABC):
                 confidence   = 0.0,
             )
             await self.learn(event, result)
+
+        await self._consolidate_hook(result)
 
         follow_up_event = await self.follow_up(event, result)
         if follow_up_event is not None:

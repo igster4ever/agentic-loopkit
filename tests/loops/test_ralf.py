@@ -177,6 +177,84 @@ async def test_no_follow_up_event_when_none_returned(tmp_path):
     assert all(e.event_type == "test.trigger" for e in stored)
 
 
+# ── Memory consolidation hook (P72a) ────────────────────────────────────────
+
+
+class _MockConsolidationResult:
+    def __init__(self, candidates):
+        self.candidates = candidates
+
+
+class _MockConsolidateStore:
+    """Minimal duck-type stand-in for agentic_memorykit's consolidate()."""
+
+    def __init__(self, candidates=None):
+        self._candidates = candidates or []
+        self.consolidate_calls: list[str] = []
+
+    async def consolidate(self, agent_id=None, **_kwargs):
+        self.consolidate_calls.append(agent_id)
+        return _MockConsolidationResult(self._candidates)
+
+
+async def test_no_memory_store_skips_consolidation(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    executor = FixedResultExecutor("e", bus, result("complete"))
+    # _memory_store defaults to None; must not raise
+    await executor.run(make_event())
+
+
+async def test_consolidate_hook_called_with_agent_name(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    executor = FixedResultExecutor("e", bus, result("complete"))
+    store = _MockConsolidateStore()
+    executor._memory_store = store
+
+    await executor.run(make_event())
+
+    assert store.consolidate_calls == ["e"]
+
+
+async def test_consolidate_hook_called_once_regardless_of_iteration_count(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    executor = StepSequenceExecutor("e", bus, [
+        result("in_progress"), result("in_progress"), result("complete"),
+    ])
+    store = _MockConsolidateStore()
+    executor._memory_store = store
+
+    await executor.run(make_event())
+
+    assert len(store.consolidate_calls) == 1
+
+
+async def test_consolidation_candidates_surfaced_not_auto_applied(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+
+    class SurfacingExecutor(FixedResultExecutor):
+        def __init__(self, name, bus, fixed):
+            super().__init__(name, bus, fixed)
+            self.surfaced: list = []
+
+        async def on_consolidation_candidates(self, candidates):
+            self.surfaced.extend(candidates)
+
+    executor = SurfacingExecutor("e", bus, result("complete"))
+    executor._memory_store = _MockConsolidateStore(candidates=["candidate-a", "candidate-b"])
+
+    await executor.run(make_event())
+
+    assert executor.surfaced == ["candidate-a", "candidate-b"]
+
+
+async def test_on_consolidation_candidates_default_is_noop(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    executor = FixedResultExecutor("e", bus, result("complete"))
+    executor._memory_store = _MockConsolidateStore(candidates=["candidate-a"])
+    # Must not raise with the default no-op override
+    await executor.run(make_event())
+
+
 # ── RALFResult helpers ───────────────────────────────────────────────────────
 
 def test_ralf_result_is_terminal():

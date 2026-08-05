@@ -230,6 +230,11 @@ class _MockMemoryStore:
             results = [r for r in results if all(t in r.tags for t in tags)]
         return results
 
+    async def forget(self, key, agent_id):
+        before = len(self._records)
+        self._records = [r for r in self._records if r.key != key]
+        return len(self._records) < before
+
 
 async def test_save_state_writes_semantic_to_memory_store(tmp_path):
     bus = EventBus(store_dir=tmp_path)
@@ -405,3 +410,55 @@ async def test_world_model_round_trip(tmp_path):
 
     assert state.world_model["adapter_retries"] == "3"
     assert state.semantic == {}
+
+
+# ── forget (P72a) ──────────────────────────────────────────────────────────────
+
+
+async def test_forget_no_memory_store_returns_false(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    agent = RecordingAgent("agent", bus)
+    # Must not raise; _memory_store is None
+    assert await agent.forget("some_key") is False
+
+
+async def test_forget_deletes_key_from_memory_store(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    agent = RecordingAgent("agent", bus)
+    store = _MockMemoryStore()
+    store._records = [_MockRecord("stale_fact", "old value", ["semantic"])]
+    agent._memory_store = store
+
+    result = await agent.forget("stale_fact")
+
+    assert result is True
+    assert store._records == []
+
+
+async def test_forget_missing_key_returns_false(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    agent = RecordingAgent("agent", bus)
+    store = _MockMemoryStore()
+    agent._memory_store = store
+
+    assert await agent.forget("never_written") is False
+
+
+async def test_forget_scopes_by_agent_id(tmp_path):
+    bus = EventBus(store_dir=tmp_path)
+    agent = RecordingAgent("agent-a", bus)
+    store = _MockMemoryStore()
+    agent._memory_store = store
+
+    forgotten_calls = []
+    real_forget = store.forget
+
+    async def _tracking_forget(key, agent_id):
+        forgotten_calls.append((key, agent_id))
+        return await real_forget(key, agent_id)
+
+    store.forget = _tracking_forget
+
+    await agent.forget("some_key")
+
+    assert forgotten_calls == [("some_key", "agent-a")]

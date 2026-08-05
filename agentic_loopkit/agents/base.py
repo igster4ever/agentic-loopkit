@@ -199,6 +199,15 @@ class AgentBase(ABC):
             world_model = {r.key: r.value for r in wm_records}
         return AgentState(episodic=[], semantic=semantic, procedural={}, world_model=world_model)
 
+    async def forget(self, key: str) -> bool:
+        """Soft-delete a semantic/world_model fact by key via _memory_store.forget().
+
+        Returns False if no _memory_store is wired, or if the key was not found.
+        """
+        if self._memory_store is None:
+            return False
+        return await self._memory_store.forget(key, agent_id=self.name)
+
     async def recall(
         self,
         text: str,

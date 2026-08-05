@@ -68,10 +68,15 @@ executor patterns layered on top.
 │                │ Wire MemoryStore via _memory_store for semantic facts.     │
 │                │ recall(text) — iterative query_iterative() retrieval;     │
 │                │ emits system.memory_query_step per step (P46).            │
+│                │ forget(key) — soft-delete via _memory_store.forget() (P72a)│
 ├────────────────┼────────────────────────────────────────────────────────────┤
 │ RALFExecutor   │ Bounded task loop. Triggered by a single event. Iterates  │
 │                │ retrieve → act → learn → follow_up. Hard cap on loops.    │
-│                │ LLM in act() only. Crash-safe via learn().                │
+│                │ LLM in act() only. Crash-safe via learn(). Optional        │
+│                │ _memory_store (P72a): _consolidate_hook() calls            │
+│                │ store.consolidate() once after the loop terminates and     │
+│                │ surfaces candidates via on_consolidation_candidates() —    │
+│                │ never auto-applies merges.                                 │
 ├────────────────┼────────────────────────────────────────────────────────────┤
 │ ReActExecutor  │ Bounded tool-use loop. Think → Execute until action="done"│
 │                │ or max_steps. LLM in think() only. execute() is           │
@@ -497,8 +502,25 @@ evidence-conditioned retrieval and wires `query_iterative()`'s `on_step` callbac
 `system.memory_query_step` after every step — an observable event per retrieval hop rather
 than one opaque result list. Returns `[]` if no `_memory_store` is wired.
 
-Tests: `tests/agents/test_memorykit_query_iterative.py` (4 tests) and
-`tests/agents/test_memorykit_integration.py` (3 tests, basic write/list/load_state wiring).
+**`AgentBase.forget(key)`** (P72a, ✅ Built 2026-08-05) — wires memorykit's already-designed
+`BaseStore.forget(key, agent_id)` into agent code; previously unreachable. Returns `False` if
+no `_memory_store` is wired or the key isn't found.
+
+**`RALFExecutor._consolidate_hook()`** (P72a, ✅ Built 2026-08-05) — optional `_memory_store`
+on `RALFExecutor` (mirrors `AgentBase`'s attribute); called once after the loop terminates
+(before `follow_up()`), calls `_memory_store.consolidate(agent_id=self.name)` and passes any
+candidates to the overridable `on_consolidation_candidates()` hook (default: log only).
+`consolidate()` is non-mutating by memorykit's own design — this hook surfaces candidates
+for review, it never calls `apply_merge()` itself.
+
+**`MemoryRecord.refs` + `MemoryStore.associate()`/`deref()`** (P72a, ✅ Built 2026-08-05,
+`agentic-memorykit` side) — typed cross-references (`{ref_kind: ref_key}`) attached via
+`associate(memory_id, ref_key, ref_kind)`; `deref(record)` resolves each ref against live
+store state (never a stale copy), scoped to the record's own `agent_id`.
+
+Tests: `tests/agents/test_memorykit_query_iterative.py` (4 tests),
+`tests/agents/test_memorykit_integration.py` (5 tests, write/list/load_state wiring + forget()),
+`tests/loops/test_ralf.py` (+6 tests for the consolidation hook, P72a).
 
 ### Additional adapters
 
