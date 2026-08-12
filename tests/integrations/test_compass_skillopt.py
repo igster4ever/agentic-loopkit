@@ -126,3 +126,69 @@ def test_run_compass_cli_passes_payload(compass_namespace):
     assert result["ok"] is True
     rejects_file = ns_dir / "skill_edit_rejections.jsonl"
     assert rejects_file.exists()
+
+
+# ── CompassSkillOptExecutor — retrieve() against a real compass namespace ──
+
+from agentic_loopkit.bus import EventBus
+from agentic_loopkit.integrations.compass_skillopt import CompassSkillOptExecutor
+
+
+def _write_full_namespace(loop_dir: Path, namespace: str) -> Path:
+    """A namespace with enough real history for retrieve() to classify sessions."""
+    ns_dir = _write_minimal_namespace(loop_dir, namespace)
+    sessions = [
+        ("2026-01-01T0900", "S1", ["goal a", "goal b"], ["goal a", "goal b"], "- learned X"),
+        ("2026-01-02T0900", "S2", ["goal c"], [], ""),
+    ]
+    for ts, sid, planned, completed, learnings_section in sessions:
+        planned_md = "\n".join(f"- {g}" for g in planned)
+        completed_md = "\n".join(f"- ✓ {g}" for g in completed) or "- (none)"
+        text = (
+            f"# Session {ts} — {namespace}\n\n"
+            f"## Planned\n{planned_md}\n\n"
+            f"## Completed\n{completed_md}\n\n"
+            f"## Incomplete\n- (none)\n\n"
+        )
+        if learnings_section:
+            text += f"## Learnings extracted\n{learnings_section}\n"
+        else:
+            text += "## Notes\nNo formal learning captured this session.\n"
+        (ns_dir / "history" / f"{ts}.md").write_text(text)
+    (ns_dir / "state.json").write_text(json.dumps({
+        "namespace": namespace,
+        "quality_history": [
+            {"session_id": "old-open-ts", "score": 0.3},
+            {"session_id": "new-open-ts", "score": 0.9},
+        ],
+    }))
+    return ns_dir
+
+
+async def test_retrieve_classifies_high_completion_no_learnings_as_success(tmp_path):
+    ns_dir = _write_full_namespace(tmp_path, "full-ns")
+    bus = EventBus(store_dir=tmp_path / "bus")
+    executor = CompassSkillOptExecutor(
+        "cso", bus, "skill text", "full-ns",
+        compass_script=COMPASS_SCRIPT, loop_dir=tmp_path,
+    )
+    trigger = object()  # retrieve() does not read event fields
+    result = await executor.retrieve(trigger)
+    all_trajectories = result["train"] + result["selection"]
+    outcomes = {t.get("outcome") for t in all_trajectories}
+    # S2 finishes 0/1 goals — a real failure. S1 finishes all goals with a
+    # ## Notes section instead of ## Learnings extracted — this must NOT be
+    # misclassified as a failure the way the old markdown parser did.
+    assert "success" in outcomes
+
+
+async def test_retrieve_freezes_holdout_when_not_already_frozen(tmp_path):
+    ns_dir = _write_full_namespace(tmp_path, "full-ns")
+    bus = EventBus(store_dir=tmp_path / "bus")
+    executor = CompassSkillOptExecutor(
+        "cso", bus, "skill text", "full-ns",
+        compass_script=COMPASS_SCRIPT, loop_dir=tmp_path,
+    )
+    await executor.retrieve(object())
+    state = json.loads((ns_dir / "state.json").read_text())
+    assert state.get("holdout_session_ids")
