@@ -163,6 +163,17 @@ The gate condition (P40): ≥ 2 consumers with different event type needs. Curre
 
 ## Planned next (v8 carry-forwards)
 
-1. **CompassSkillOptExecutor end-to-end demo** — wire compass session history as the SkillOptExecutor training corpus; prove the self-improvement loop closes with real data; the one open checkbox from v5/v6/v7.
+1. ~~**CompassSkillOptExecutor end-to-end demo**~~ — **closed 2026-08-12.** The
+   gap was not missing wiring but a broken classifier: the old
+   `examples/compass_skill_opt_demo.py` parser required a non-empty
+   `## Learnings extracted` section to count a session as a success, which
+   misclassified ~90% of real sessions (35/38) as failures. Fixed by moving
+   `CompassSkillOptExecutor` to `agentic_loopkit/integrations/compass_skillopt.py`
+   and delegating classification to compass's own `_classify_session()` via
+   the compass CLI (`skill-opt-run`/`get-skillopt-status`) instead of
+   re-parsing markdown. Real-data proof against the `agentic-loopkit` compass
+   namespace: `best_score` 0.0 → 0.578, session classification 3/38 → 13/20
+   high-quality. See `~/.claude/skills/compass/docs/skillopt-design.md` and
+   compass's `CLAUDE.md` "Skill-opt training corpus — agentic-loopkit" section.
 2. **`docs/event-catalog.md`** — add `community.entry_received` event type entry.
 3. **`/loopkit-docs-hygiene`** — full docs hygiene check post-v7 (architecture.md executor table, idioms-adoption-plan.md, dashboard-architecture.md enum values).

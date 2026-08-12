@@ -39,6 +39,9 @@ agentic_loopkit/
 │   ├── calibration.py       # CalibrationRecord (P60) — self-prediction vs. verified-outcome gap; wired into OutcomeExecutor._post_act_hook()
 │   └── frontier.py          # BranchScore + FrontierCandidate + FrontierSelector (P62a) — utility + productivity + novelty ranking primitive
 │
+├── integrations/
+│   └── compass_skillopt.py  # CompassSkillOptExecutor — real compass session history as SkillOptExecutor's training corpus, via the compass CLI (subprocess/JSON), not by parsing compass files directly
+│
 ├── utils/
 │   └── time.py              # Shared UTC helpers: utc_now(), iso_format(), now_ms(), now_unix(), ms_to_iso()
 │

@@ -200,9 +200,13 @@ Note: `SelfHarnessExecutor.evaluate()` is deterministic (calls `regression_gate(
 Caveat (P64c, audited 2026-07-15): `regression_gate()` gates edits only when `SkillOptExecutor`
 is wrapped by `SelfHarnessExecutor`. Used directly, `SkillOptExecutor.act()` applies accepted
 edits via its own internal selection-split score gate and never calls `regression_gate()` —
-confirmed live in the shipped `examples/compass_skill_opt_demo.py`, which drives
-`SkillOptExecutor` standalone. `regression_gate()` is one available validation path, not a
-structural guarantee for all `SkillOptExecutor` edits.
+confirmed live in `agentic_loopkit/integrations/compass_skillopt.py`'s
+`CompassSkillOptExecutor` (moved here from `examples/compass_skill_opt_demo.py`
+2026-08-12; the example file now only demonstrates the synthetic-fixture
+`_DemoCompassSkillOptExecutor` subclass), which drives `SkillOptExecutor`
+standalone against real compass session history. `regression_gate()` is one
+available validation path, not a structural guarantee for all
+`SkillOptExecutor` edits.
 
 ---
 

@@ -245,6 +245,15 @@ block but the optimizer writes it; the task agent reads it but never modifies it
 
 ## Integration Pattern
 
+**Historical sketch — superseded.** The real implementation is
+`agentic_loopkit/integrations/compass_skillopt.py`'s `CompassSkillOptExecutor`
+(2026-08-12). It does not read compass history files directly, as sketched
+below — it calls the compass CLI (`skill-opt-run`, `get-skillopt-status`,
+`freeze-holdout`) over subprocess and reuses compass's own frozen holdout
+split, and `score()` is a deterministic keyword-overlap against each
+session's `learnings`, not a `hit_rate` average. Kept here for the original
+design rationale only.
+
 ```python
 from agentic_loopkit import EventBus, Event
 from agentic_loopkit.loops.skillopt import SkillOptExecutor, SkillEdit
