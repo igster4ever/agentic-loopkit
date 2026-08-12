@@ -26,11 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "examples"))
 from compass_skill_opt_demo import (
     DEMO_SKILL,
     DEMO_TRAJECTORIES,
-    CompassSkillOptExecutor,
-    _parse_history_file,
-    _train_selection_split,
-    _write_demo_store,
-    load_trajectories,
+    _DemoCompassSkillOptExecutor,
 )
 
 from agentic_loopkit.bus import EventBus
@@ -42,12 +38,6 @@ from agentic_loopkit.testing import AgentTestHarness, TestResult, TestSuiteResul
 
 
 @pytest.fixture
-def demo_store(tmp_path: Path) -> Path:
-    _write_demo_store(tmp_path)
-    return tmp_path
-
-
-@pytest.fixture
 def trigger() -> Event:
     return Event(
         event_type="harness.skill_opt_requested",
@@ -56,89 +46,27 @@ def trigger() -> Event:
     )
 
 
-# ── History parsing ───────────────────────────────────────────────────────────
-
-
-def test_parse_history_file_success_outcome(demo_store):
-    files = sorted((demo_store / "history").glob("*.md"))
-    # demo-S01 is a success session (all goals completed, learnings present)
-    s01 = next(f for f in files if "S01" in f.name)
-    traj = _parse_history_file(s01)
-    assert traj["outcome"] == "success"
-    assert len(traj["learnings"]) > 0
-    assert len(traj["completed"]) == len(traj["planned"])
-
-
-def test_parse_history_file_failure_outcome(demo_store):
-    files = sorted((demo_store / "history").glob("*.md"))
-    # demo-S02 is a failure session (incomplete goal, no learnings)
-    s02 = next(f for f in files if "S02" in f.name)
-    traj = _parse_history_file(s02)
-    assert traj["outcome"] == "failure"
-    assert len(traj["incomplete"]) > 0
-
-
-def test_load_trajectories_returns_all(demo_store):
-    trajectories = load_trajectories(demo_store)
-    assert len(trajectories) == len(DEMO_TRAJECTORIES)
-
-
-def test_load_trajectories_empty_dir(tmp_path):
-    (tmp_path / "history").mkdir()
-    assert load_trajectories(tmp_path) == []
-
-
-def test_load_trajectories_missing_history(tmp_path):
-    assert load_trajectories(tmp_path) == []
-
-
-# ── Train/selection split ─────────────────────────────────────────────────────
-
-
-def test_train_selection_split_80_20():
-    trajs = [{"session_id": str(i)} for i in range(10)]
-    train, selection = _train_selection_split(trajs)
-    assert len(train) == 8
-    assert len(selection) == 2
-
-
-def test_train_selection_split_minimum_one():
-    trajs = [{"a": 1}, {"b": 2}]
-    train, selection = _train_selection_split(trajs)
-    assert len(train) >= 1
-    assert len(selection) >= 1
-
-
-def test_train_selection_split_single_item():
-    trajs = [{"only": True}]
-    train, selection = _train_selection_split(trajs)
-    assert train == trajs
-    assert selection == trajs
-
-
 # ── Score ─────────────────────────────────────────────────────────────────────
 
 
-async def test_score_returns_float_in_range(demo_store, tmp_path):
+async def test_score_returns_float_in_range(tmp_path):
     bus = EventBus(store_dir=tmp_path / "bus")
-    executor = CompassSkillOptExecutor("cso", bus, DEMO_SKILL, demo_store)
-    trajectories = load_trajectories(demo_store)
-    score = await executor.score(DEMO_SKILL, trajectories)
+    executor = _DemoCompassSkillOptExecutor("cso", bus, DEMO_SKILL)
+    score = await executor.score(DEMO_SKILL, DEMO_TRAJECTORIES)
     assert 0.0 <= score <= 1.0
 
 
-async def test_score_is_deterministic(demo_store, tmp_path):
+async def test_score_is_deterministic(tmp_path):
     bus = EventBus(store_dir=tmp_path / "bus")
-    executor = CompassSkillOptExecutor("cso", bus, DEMO_SKILL, demo_store)
-    trajectories = load_trajectories(demo_store)
-    s1 = await executor.score(DEMO_SKILL, trajectories)
-    s2 = await executor.score(DEMO_SKILL, trajectories)
+    executor = _DemoCompassSkillOptExecutor("cso", bus, DEMO_SKILL)
+    s1 = await executor.score(DEMO_SKILL, DEMO_TRAJECTORIES)
+    s2 = await executor.score(DEMO_SKILL, DEMO_TRAJECTORIES)
     assert s1 == s2
 
 
 async def test_score_zero_when_no_success_trajectories(tmp_path):
     bus = EventBus(store_dir=tmp_path / "bus")
-    executor = CompassSkillOptExecutor("cso", bus, DEMO_SKILL, tmp_path)
+    executor = _DemoCompassSkillOptExecutor("cso", bus, DEMO_SKILL)
     failures_only = [t for t in DEMO_TRAJECTORIES if t["outcome"] == "failure"]
     score = await executor.score(DEMO_SKILL, failures_only)
     assert score == 0.0
@@ -147,9 +75,9 @@ async def test_score_zero_when_no_success_trajectories(tmp_path):
 # ── Reflect stub ──────────────────────────────────────────────────────────────
 
 
-def test_reflect_stub_proposes_edit_on_failures(demo_store, tmp_path):
+def test_reflect_stub_proposes_edit_on_failures(tmp_path):
     bus = EventBus(store_dir=tmp_path / "bus")
-    executor = CompassSkillOptExecutor("cso", bus, DEMO_SKILL, demo_store)
+    executor = _DemoCompassSkillOptExecutor("cso", bus, DEMO_SKILL)
     failures = [t for t in DEMO_TRAJECTORIES if t["outcome"] == "failure"]
     edits = executor._reflect_stub(DEMO_SKILL, failures, [], [])
     # failures all have "Run docs hygiene" as incomplete — should produce an append edit
@@ -161,16 +89,16 @@ def test_reflect_stub_proposes_edit_on_failures(demo_store, tmp_path):
 
 def test_reflect_stub_returns_empty_on_no_failures(tmp_path):
     bus = EventBus(store_dir=tmp_path / "bus")
-    executor = CompassSkillOptExecutor("cso", bus, DEMO_SKILL, tmp_path)
+    executor = _DemoCompassSkillOptExecutor("cso", bus, DEMO_SKILL)
     edits = executor._reflect_stub(DEMO_SKILL, [], [], [])
     assert edits == []
 
 
-def test_reflect_stub_skips_rejected_content(demo_store, tmp_path):
+def test_reflect_stub_skips_rejected_content(tmp_path):
     from agentic_loopkit.loops.skillopt import RejectedEdit
 
     bus = EventBus(store_dir=tmp_path / "bus")
-    executor = CompassSkillOptExecutor("cso", bus, DEMO_SKILL, demo_store)
+    executor = _DemoCompassSkillOptExecutor("cso", bus, DEMO_SKILL)
     failures = [t for t in DEMO_TRAJECTORIES if t["outcome"] == "failure"]
 
     edits = executor._reflect_stub(DEMO_SKILL, failures, [], [])
@@ -184,19 +112,19 @@ def test_reflect_stub_skips_rejected_content(demo_store, tmp_path):
 # ── Full run integration ──────────────────────────────────────────────────────
 
 
-async def test_run_completes(demo_store, tmp_path, trigger):
+async def test_run_completes(tmp_path, trigger):
     bus = EventBus(store_dir=tmp_path / "bus")
     await bus.start()
-    executor = CompassSkillOptExecutor("cso", bus, DEMO_SKILL, demo_store)
+    executor = _DemoCompassSkillOptExecutor("cso", bus, DEMO_SKILL)
     result = await executor.run(trigger)
     await bus.stop()
     assert result.status in ("complete", "error")
 
 
-async def test_run_emits_candidate_eval_events(demo_store, tmp_path, trigger):
+async def test_run_emits_candidate_eval_events(tmp_path, trigger):
     bus = EventBus(store_dir=tmp_path / "bus")
     await bus.start()
-    executor = CompassSkillOptExecutor("cso", bus, DEMO_SKILL, demo_store)
+    executor = _DemoCompassSkillOptExecutor("cso", bus, DEMO_SKILL)
     await executor.run(trigger)
     await bus.stop()
 
@@ -206,10 +134,10 @@ async def test_run_emits_candidate_eval_events(demo_store, tmp_path, trigger):
     assert len(eval_events) >= 1
 
 
-async def test_run_emits_final_event(demo_store, tmp_path, trigger):
+async def test_run_emits_final_event(tmp_path, trigger):
     bus = EventBus(store_dir=tmp_path / "bus")
     await bus.start()
-    executor = CompassSkillOptExecutor("cso", bus, DEMO_SKILL, demo_store)
+    executor = _DemoCompassSkillOptExecutor("cso", bus, DEMO_SKILL)
     await executor.run(trigger)
     await bus.stop()
 
@@ -222,10 +150,10 @@ async def test_run_emits_final_event(demo_store, tmp_path, trigger):
     assert "best_skill_length" in p
 
 
-async def test_run_epoch_events_have_required_fields(demo_store, tmp_path, trigger):
+async def test_run_epoch_events_have_required_fields(tmp_path, trigger):
     bus = EventBus(store_dir=tmp_path / "bus")
     await bus.start()
-    executor = CompassSkillOptExecutor("cso", bus, DEMO_SKILL, demo_store)
+    executor = _DemoCompassSkillOptExecutor("cso", bus, DEMO_SKILL)
     await executor.run(trigger)
     await bus.stop()
 
