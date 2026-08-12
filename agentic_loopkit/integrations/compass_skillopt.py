@@ -8,6 +8,29 @@ markdown or reads compass's state.json directly.
 """
 from __future__ import annotations
 
+import json
+import os
+import subprocess
+from pathlib import Path
+
+
+def _run_compass_cli(
+    compass_script: Path,
+    command: str,
+    namespace: str,
+    payload: str | None = None,
+    loop_dir: Path | None = None,
+) -> dict:
+    """Run one compass CLI command and parse its JSON stdout."""
+    args = ["python3", str(compass_script), command, namespace]
+    if payload is not None:
+        args.append(payload)
+    env = os.environ.copy()
+    if loop_dir is not None:
+        env["COMPASS_LOOP_DIR"] = str(loop_dir)
+    result = subprocess.run(args, capture_output=True, text=True, env=env, check=True)
+    return json.loads(result.stdout)
+
 
 def _build_trajectories(
     evidence: list[dict], quality_history: list[dict], holdout_ids: list[str],
