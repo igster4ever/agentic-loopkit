@@ -1,6 +1,6 @@
 # AgentRadio passive-awareness carryforward (agentic-loopkit)
 
-**Status:** Design doc only — nothing implemented yet. Grounding step required before implementation (see below).
+**Status:** Step 0 audit complete (2026-08-13) — verdict: does not apply to `UtilityExecutor` as it exists today. Not implementing. See "Step 0 — audit findings" below; the original open questions are kept for the record.
 **Source:** Ren et al., "AgentRadio: Passive Awareness for Long-Horizon Multi-Agent Collaboration" (arXiv:2607.28430, Jul 2026).
 **Master doc:** `~/.claude/projects/-Users-ismith--claude-skills-compass/memory/project_agentradio_findings.md` (paper summary and cross-project priority notes — this doc is the loopkit-specific grounding referenced from there).
 
@@ -29,12 +29,13 @@ Everything else checked is single-agent, not multi-agent: `AgentBase` (`agents/b
 - If a sibling's finding is relevant (e.g. rules out an approach the current candidate is still pursuing), fold it into the current candidate's next step rather than continuing blind — this is the exact mechanism the paper's MinIO case study shows recovering a rubric that dies unvoiced under blocking receive (Figure 6).
 - Ranking after `asyncio.gather` resolves stays as-is; the change is entirely about what happens *during* generation, not the selection step.
 
-## Step 0 — audit before building (do not skip)
+## Step 0 — audit findings (2026-08-13)
 
-This session did not confirm:
-1. Whether `EventRouter.subscribe` supports a non-blocking "check for new messages since last check" poll, or only a callback-on-publish model — the paper's primitive is specifically non-blocking-checked-between-steps, not callback-interrupt-driven. If `EventRouter` is callback-only, that's closer to "interrupts the recipient on delivery" (HANDRAISER's pattern, which the paper's Related Work distinguishes from its own approach) than to passive awareness — confirm which shape fits before designing against it.
-2. Whether `max_candidates` runs are typically long enough (multiple LLM-call steps per candidate) for mid-generation folding to matter at all — if each candidate is a single one-shot call, there's no "between steps" moment for a mention check to land in, and this entire idea doesn't apply to `UtilityExecutor` as it stands.
-3. Read `docs/utility-executor-design.md` in full (not done this session, out of read-only/no-design scope) — it may already contain prior thinking on candidate independence that either supports or rules out this design.
+1. **`EventRouter.subscribe` is callback-on-publish only** (`agentic_loopkit/events/router.py`) — there is no cursor/poll API (no `get_new_since()`, no queue drain method). `publish()` directly `await`s every matching subscriber inline, on whichever coroutine called `publish()`. That is a meaningfully different — and more hazardous — shape than the paper's non-blocking poll: it is the *publisher's* call stack invoking the *subscriber's* registered function, not the subscriber checking for messages at a moment of its own choosing. Confirms the original suspicion: this is closer to interrupt-on-delivery (HANDRAISER's pattern) than to passive awareness. Implementing the paper's design against `EventRouter` as-is would require either (a) a new poll-style read (e.g. a per-candidate cursor over a buffered stream of `utility.candidate_progress` events) built alongside the router, not a `subscribe()` callback, or (b) accepting the callback-interrupt shape and dropping the "never stops to listen" property entirely.
+2. **Every concrete `generate_candidates()` in this repo is one-shot per candidate.** The module docstring's canonical usage (`AdrSummarySelector`), both `tests/loops/test_utility.py` fixtures, and `docs/utility-executor-design.md`'s own usage example all call a single `llm.call(...)` per candidate via `asyncio.gather`. The abstract base doesn't forbid a multi-step candidate generator, but nothing in this codebase demonstrates or requires one. **As it stands, there is no "between steps" moment for a mid-generation mention check to land in — this idea does not apply to `UtilityExecutor` today.**
+3. **`docs/utility-executor-design.md` read in full — orthogonal, not supporting or ruling out.** Its only isolation contract concerns `utility_score()` (scoring must not see sibling candidates or generation history, to avoid anchoring). It says nothing about candidate independence *during* `generate_candidates()` itself — that step is entirely unaddressed by the design doc.
+
+**Verdict:** two independent negatives. (1) The substrate (`EventRouter`) is push/callback, not poll — the paper's primitive would need a different mechanism to build against. (2) No current `UtilityExecutor` usage has multi-step candidates to fold information into. Revisit only if a consumer builds a genuinely multi-step `generate_candidates()` — at that point, item 1's poll-vs-callback gap becomes the actual blocker to solve first.
 
 ## Explicitly out of scope for this item
 
